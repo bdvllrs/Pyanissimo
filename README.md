@@ -1,2 +1,7 @@
 # Pyanissimo
-LSTM Network that generates music using theano
+LSTM Network that generates music using theano.
+
+## Dependencies
+- theano
+- tkinter
+- numpy
