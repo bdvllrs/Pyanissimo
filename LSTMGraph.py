@@ -290,8 +290,8 @@ class LSTMGraph:
                 outputs.append(h)  # nouveau h
                 outputs.append(c)  # nouveau x
         outputs = [x] + outputs  # les sorties sont la sortie finale x et les valeurs intermédiaires à repasser au réseau au temps suivant
-        cond = T.eq(x, stop_condition)
-        return tuple(outputs), scan_module.until(T.eq(T.min(cond), 1))  # x (output), vals_t, ..., condition d'arret
+        cond = T.eq(T.argmax(x), T.argmax(stop_condition))
+        return tuple(outputs), scan_module.until(cond)  # x (output), vals_t, ..., condition d'arret
 
     def model_simple_layer(self, x, num_layer):
         """
