@@ -190,6 +190,10 @@ def makeFile(data, filename, step=10000):
     e.data = b''
     tr.events.append(e)
     m.tracks.append(tr)
+    # débug
+    f = open('midi_write.txt', 'w')
+    print(m.tracks[0], file=f)
+    f.close()
     # écriture
     m.open(filename, 'wb')
     m.write()
@@ -201,11 +205,7 @@ if __name__ == '__main__':
     print('write file')
     makeFile(data, 'test.mid')
     print('written!')
-
     dt = loadFile('test.mid')
-
-
-
 
 
     
