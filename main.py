@@ -304,9 +304,10 @@ class Interface(tk.Tk):
         for art in self.selectedFiles.files:
             if self.selectedFiles.enabled[art].get() == '1':
                 fileList.extend([art+'/'+n for n in self.selectedFiles.files[art]])
-        self.trainingThread = threading.Thread(target=lambda :self._train(fileList))
+        print('files:',fileList)
+        self.trainingThread = threading.Thread(target=self._train, args=[fileList])
 
-        self.readingThread = threading.Thread(target=lambda :self._load_data(fileList))
+        self.readingThread = threading.Thread(target=self._load_data, args=[fileList])
 
         # configuration du dialogue de progression
         self.trainingDialog = TrainingDialog(self)
@@ -362,8 +363,12 @@ class Interface(tk.Tk):
         """
         Fonction dans un thread séparé de chargement des données
         """
+        if not fileList:
+            return
         for k in range(self.entryEpoch.get_value()):
-            for name in random.shuffle(fileList):
+            rdFileList = fileList[:]
+            random.shuffle(rdFileList)
+            for name in rdFileList:
                 # attend d'avoir à charger un fichier
                 while self.dataSpace == 0 and not self.stoppingTraining:
                     time.sleep(0.1)
@@ -383,6 +388,8 @@ class Interface(tk.Tk):
         """
         Fonction qui tourne dans un thread séparé et entraine le réseau
         """
+        if not fileList:
+            return
         # Crée le réseau
         if not self.reseau:
             self.init_reseau(lambda t: self.trainingDialog.update_file('Initialisation du réseau:'+t, -1))
