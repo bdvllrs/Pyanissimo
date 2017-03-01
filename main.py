@@ -143,7 +143,7 @@ class NumberEntry(tk.Frame):
         self.label.pack(side=tk.LEFT)
 
         validatecommand = self.register(self.validate_entry)
-        self.entry = tk.Entry(self, validate='key', validatecommand=(validatecommand, '%S', '%V'))
+        self.entry = tk.Entry(self, validate='key', validatecommand=(validatecommand, '%P', '%V'))
         self.entry.pack(side=tk.LEFT)
         if self.validate_entry(defaultval, 'init'):
             self.entry.insert(0, str(defaultval))
