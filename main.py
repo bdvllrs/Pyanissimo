@@ -2,6 +2,7 @@
 import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.filedialog
+import tkinter.messagebox
 import os
 import threading
 import file
@@ -165,7 +166,7 @@ class Interface(tk.Tk):
         self.readingThread = None
         self.dataLock = threading.Lock()
         self.dataQueue = []
-        self.dataSpace = 4 # nombre de fichiers chargés en avance
+        self.dataSpace = 1 # nombre de fichiers chargés en avance
         # écriture d'un nouveau fichier
         self.creationThread = None
         self.creationFinished = True
@@ -298,7 +299,7 @@ class Interface(tk.Tk):
             self.reseau = LSTM(131, 0.1, True)
             self.reseau.add_lstm_layer(131)
             self.reseau.add_simple_layer(131)
-            self.reseau.graph.debug_print = lambda t:self.trainingDialog.updateAdv(t, 0)
+            self.reseau.graph.debug_print = lambda t: self.trainingDialog.updateAdv(t, 0)
             # TODO: connect progressbar
             self.reseau.init_graph()
 
