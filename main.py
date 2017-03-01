@@ -311,7 +311,7 @@ class Interface(tk.Tk):
 
         # configuration du dialogue de progression
         self.trainingDialog = TrainingDialog(self)
-        self.trainingDialog.set_file_qty(len(fileList) + 1)
+        self.trainingDialog.set_file_qty((len(fileList)+1)*(self.entryEpoch.get_value()+1))
         self.trainingDialog.protocol('WM_DELETE_WINDOW', self.on_training_stop)
 
         # lancement
@@ -379,7 +379,7 @@ class Interface(tk.Tk):
                 data = file.loadFile('musics/format 0/'+name)
                 # charge les données dans la file
                 self.dataLock.acquire()
-                self.dataQueue.append(data)
+                self.dataQueue.append( (name, data) )
                 self.dataSpace -= 1
                 self.dataLock.release()
         return
@@ -403,22 +403,23 @@ class Interface(tk.Tk):
             return
         for k in range(self.entryEpoch.get_value()):
             for i in range(len(fileList)):
-                # màj les informations du dialog
-                self.trainingDialog.update_file(str(i+1), i+1)
-                self.trainingDialog.update_adv('Chargement', 0)
-                self.status.update((i+1)*100/(len(fileList)+1), 'Entrainement...')
                 # attend d'avoir des données disponibles
                 while len(self.dataQueue) == 0:
                     time.sleep(0.1)
+                # récupère une page de donnée
+                self.dataLock.acquire()
+                name, data = self.dataQueue.pop(0)
+                self.dataSpace += 1
+                self.dataLock.release()
+                # màj les informations du dialog
+                tx = '(E:'+str(k+1)+'/'+str(self.entryEpoch.get_value())+' F:'+str(i+1)+'/'+str(len(fileList))+') '
+                self.trainingDialog.update_file(tx+name, (i+1)*(k+1))
+                self.trainingDialog.update_adv('Chargement', 0)
+                self.status.update((i+1)*(k+1)*100/((len(fileList)+1)*self.entryEpoch.get_value()), 'Entrainement...')
                 if self.stoppingTraining:
                     print('STOP!')
                     self.waitingForStop = False
                     return
-                # récupère une page de donnée
-                self.dataLock.acquire()
-                data = self.dataQueue.pop(0)
-                self.dataSpace += 1
-                self.dataLock.release()
                 # transforme en entrées -> sorties
                 x = data[:-1]
                 y = data[1:]
