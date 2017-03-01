@@ -7,6 +7,15 @@ import theano.printing as pr
 import theano.tensor as T
 import pickle
 
+def print_callback_fn(op, xin):
+    for attr in op.attrs:
+        temp = getattr(xin, attr)
+        if callable(temp):
+            pmsg = temp()
+        else:
+            pmsg = temp
+        if(op.message != '0'):
+            print(op.message)
 
 class LSTMGraph:
     def __init__(self, nb_inputs=None, learning_rate=0.01, bptt_truncate=-1, debug=False):
@@ -17,7 +26,8 @@ class LSTMGraph:
         self.learning_rate = learning_rate
         self.bptt_truncate = bptt_truncate
         self.debug = debug
-        self.print_callback = pr._print_fn
+        # self.print_callback = pr._print_fn
+        self.print_callback = print_callback_fn
         self.train = lambda: print('Utiliser init_train pour activer cette fonction.')
         self.cost = lambda: print('Utiliser init_train pour activer cette fonction.')
         self.BPTT = lambda: print('Utiliser init_train pour activer cette fonction.')
@@ -101,6 +111,7 @@ class LSTMGraph:
         x = T.dmatrix()  # On créé un vecteur d'entrée de type double
         expected = T.dmatrix('expected')  # Valeur attendue
         learning_rate = T.scalar('learning_rate')  # vitesse d'apprentissage
+        num_passage = shared(0)
 
         outputs_info = [None] # paramètres évolutifs à fournir au model_layers, None correspond à la sortie finale du réseau qui n'a pas de valeur initiale
 
@@ -108,6 +119,7 @@ class LSTMGraph:
             if layer['type'] == 'lstm':
                 outputs_info.append(T.zeros(layer['length']))  # h_prev
                 outputs_info.append(T.zeros(layer['length']))  # c_prev
+        outputs_info.append(None)
 
         self.debug_print('Définition de la structure des couches.')
 
@@ -116,10 +128,12 @@ class LSTMGraph:
             sequences=x,  # on boucle sur le nombre d'entrée
             truncate_gradient=self.bptt_truncate,  # Nombre d'étape pour le truncate BPTT (backpropagation through time)
                                                     # Si égale à -1, on utilise le BPTT classique
-            outputs_info=outputs_info # Initialisation des paramètres données à fn
+            outputs_info=outputs_info, # Initialisation des paramètres données à fn
+            non_sequences=num_passage
         )
 
         last_output = outputs[0]  # Sortie finale, les autres sont les valeurs des mémoires intermédiaires
+        debug_print = outputs[-1]
 
         self.debug_print('Définition de la fonction d\'erreur.')
 
@@ -156,9 +170,13 @@ class LSTMGraph:
                 outputs_info.append(T.zeros(layer['length']))  # h_prev
                 outputs_info.append(T.zeros(layer['length']))  # c_prev
 
+        outputs_info.append(None)
+
+        num_passage.set_value(0)
+
         o, updated = scan(  # On fait une boucle sur le model (dans le temps)
             fn=self.model_layers_predict,  # fonction appliqué à chaque étape
-            non_sequences=arret,  
+            non_sequences=[num_passage, arret],  
             outputs_info=outputs_info, # Initialisation des paramètres données à fn
             n_steps=max_temps
         )
@@ -169,7 +187,7 @@ class LSTMGraph:
         self.debug_print('Compilation de la fonction d\'apprentissage.')
 
         # Création de la fonction d'entrainement
-        self.train = function([x, expected, learning_rate], [cost, last_output], updates=updates)
+        self.train = function([x, expected, learning_rate], [cost, last_output, debug_print], updates=updates)
 
         self.debug_print('Graphe initialisé.')
 
@@ -255,10 +273,10 @@ class LSTMGraph:
         args = list(args)
         num_arg = 0
         outputs = []
-        # debug_printing = self.print_callback('Activation du réseau...')
+        num_passage = args[-1]
         for k in range(len(self.layers)):
+            debug_printing = pr.Print(str(num_passage.get_value()), global_fn=self.print_callback)(x)
             layer = self.layers[k]
-            # res = debug_printing(k)
             if layer['type'] == 'simple':  # si c'est un simple on utilise le model simple
                 x = self.model_simple_layer(x, k)
             elif layer['type'] == 'lstm':  # sinon celui de lstm
@@ -268,6 +286,10 @@ class LSTMGraph:
                 outputs.append(h)  # nouveau h
                 outputs.append(c)  # nouveau x
         outputs = [x] + outputs  # les sorties sont la sortie finale x et les valeurs intermédiaires à repasser au réseau au temps suivant
+        
+        num_passage.set_value(num_passage.get_value()+1)  # On met à jour la valeur du numéro de passage
+
+        outputs.append(debug_printing)
         return tuple(outputs)  # x (output), vals_t, ...
 
     def model_layers_predict(self, x, *args):
@@ -278,6 +300,7 @@ class LSTMGraph:
         """
         args = list(args)
         stop_condition = args[-1]
+        args = args[:-1]
         outputs = list(self.model_layers(x, *args))
         # cond = T.eq(T.argmax(x), T.argmax(stop_condition))
         cond = self.predict_stopping_condition(x, stop_condition)
