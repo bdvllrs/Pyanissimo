@@ -63,11 +63,9 @@ def loadFile(name, step=10):
 
 def to3bytes(num):
     L = []
-    print(num)
     for i in range(3):
         L.append(num % 256)
         num = num >> 8
-    print(L)
     return bytes(L[::-1])
 
 def makeFile(data, filename, step=10000):

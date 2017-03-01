@@ -196,7 +196,7 @@ class Interface(tk.Tk):
             self.reseau = LSTM(131, 0.1, True)
             self.reseau.add_lstm_layer(131)
             self.reseau.add_simple_layer(131)
-            self.reseau.graph.debug_print = lambda t:print('Initialisation du réseau:'+t)
+            self.reseau.graph.debug_print = lambda t: print('Initialisation du réseau:'+t)
             # TODO: connect progressbar
             self.reseau.init_graph()
 
@@ -362,23 +362,12 @@ class Interface(tk.Tk):
             return
         print('Start generation')
         # génère la musique
-        frame = np.asarray( [1*(i==129) for i in range(128+3)] )
-        frames = [frame]
-        count = 0
-        while frame[130] < 0.5 and count < 500:
-            self.status.update(0, 'Génération:'+str(count))
-            count += 1
-            frame = self.reseau.predict(frames)[-1]
-            frames.append(frame)
+        frames = self.reseau.predict([1*(i==129) for i in range(128+3)], [0], 50000)
         # fixe à 0 ou 1 les notes
         for n in range(len(frames)):
             for i in range(128):
                 frames[n][i] = int(frames[n][i]+0.5)
-        print('Saving')
-        # debug
-        tstf = open('testing.txt', 'w')
-        print(frames, file=tstf)
-        tstf.close()
+        print('Saving '+str(len(frames))+' frames')
         # enregistre
         file.makeFile(frames, 'test.mid')
         self.creationFinished = True
