@@ -201,12 +201,15 @@ class Interface(tk.Tk):
             self.reseau.init_graph()
 
         # demande le fichier
-        file = tk.filedialog.askopenfilename(defaultextension='.dat',
-                                             filetypes=[('weight files','.dat'), ('all files', '.*')],
-                                             parent=self, title='Choix des poids')
+        filename = tk.filedialog.askopenfilename(defaultextension='.dat',
+                                                 filetypes=[('weight files','.dat'), ('all files', '.*')],
+                                                 parent=self, title='Choix des poids')
         # charge les poids
-        self.reseau.load_weights(file)
-        print('Chargement terminé!')
+        if filename:
+            self.reseau.load_weights(filename)
+            print('Chargement terminé!')
+        else:
+            print('Chargement non effectué')
 
     def startTrainingThread(self):
         # changement des variables d'état

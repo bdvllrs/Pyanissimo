@@ -355,7 +355,7 @@ class LSTMGraph:
         pickle.dump(layers, open(file, 'ab'))
         return self
 
-    def load_weights(self, layer, file):
+    def load_weights(self, file):
         """
         Utilise les fichiers pour initialiser les poids
         """
