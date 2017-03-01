@@ -7,8 +7,8 @@ import os
 import threading
 import file
 import time
-import numpy as np
 from LSTM import LSTM
+
 
 class FileSelector(tk.Frame):
     """
@@ -17,7 +17,7 @@ class FileSelector(tk.Frame):
     def __init__(self, parent):
         tk.Frame.__init__(self, parent, relief=tk.RIDGE, bd=2)
         self.files = {}
-        self.discoverFiles()
+        self.discover_files()
         self.enabled = {}
         self.checks = {}
         for opt in sorted(list(k for k in self.files)):
@@ -27,7 +27,7 @@ class FileSelector(tk.Frame):
             self.checks[opt].deselect()
             self.checks[opt].pack(anchor=tk.W)
 
-    def discoverFiles(self):
+    def discover_files(self):
         """
         Cherche la liste des fichiers présents dans le dossier 'music/format 0'
         """
@@ -43,6 +43,7 @@ class FileSelector(tk.Frame):
                 if len(files)>0:
                     self.files[ar] = files
                 break
+
 
 class StatusBar(tk.Frame):
     """
@@ -70,6 +71,7 @@ class StatusBar(tk.Frame):
             clamp = min(max(step,0),100)
             self.progressValue.set(int(clamp))
 
+
 class TrainingDialog(tk.Toplevel):
     def __init__(self, parent):
         tk.Toplevel.__init__(self, parent)
@@ -94,33 +96,34 @@ class TrainingDialog(tk.Toplevel):
         self.progAdv = ttk.Progressbar(self, orient=tk.HORIZONTAL, mode='determinate', length=400, variable=self.progAdvValue)
         self.progAdv.pack(side=tk.TOP)
         
-    def setFileQty(self, value):
+    def set_file_qty(self, value):
         """
         Nombre de fichier total à parcourir
         """
         self.progFile.config(maximum=value)
         self.progFileMax = value
 
-    def setFileMax(self, value):
+    def set_file_max(self, value):
         """
         Taille du fichier à parcourir (en nombre d'échantillons)
         """
         self.progAdv.config(maximum=value)
         self.progAdvMax = value
-        
-    def updateFile(self, info, num):
+
+    def update_file(self, info, num):
         """
         Affiche le numéro et le nom du fichier actuel
         """
         self.fileLabel.config(text=info)
         self.progFileValue.set(num)
-        
-    def updateAdv(self, state, num):
+
+    def update_adv(self, state, num):
         """
         Affiche la progression dans le fichier actuel
         """
         self.advLabel.config(text='Etape:'+state)
         self.progAdvValue.set(num)
+
 
 class Interface(tk.Tk):
     """
@@ -139,13 +142,13 @@ class Interface(tk.Tk):
         # self.btSave = tk.Button(self.cmdFrame, text='Sauver le réseau')
         # self.btSave.pack()
 
-        self.btTrain = tk.Button(self.cmdFrame, text="Commencer l'entrainement", command=self.confirmTrain)
+        self.btTrain = tk.Button(self.cmdFrame, text="Commencer l'entrainement", command=self.confirm_train)
         self.btTrain.pack()
 
-        self.btCreate = tk.Button(self.cmdFrame, text="Ecrire la musique", command=self.startCreation)
+        self.btCreate = tk.Button(self.cmdFrame, text="Ecrire la musique", command=self.start_creation)
         self.btCreate.pack()
 
-        self.btLoad = tk.Button(self.cmdFrame, text='Charger des poids', command=self.loadWeights)
+        self.btLoad = tk.Button(self.cmdFrame, text='Charger des poids', command=self.load_weights)
         self.btLoad.pack()
         
         # sélection des fichiers
@@ -173,7 +176,7 @@ class Interface(tk.Tk):
 
         self.reseau = None
 
-    def confirmTrain(self):
+    def confirm_train(self):
         """
         Affiche une boite de confirmation de démarrage de l'apprentissage
         """
@@ -181,14 +184,20 @@ class Interface(tk.Tk):
         num = sum(len(self.selectedFiles.files[f]) for f in self.selectedFiles.files if self.selectedFiles.enabled[f].get()=='1')
         resp = tk.messagebox.askquestion('Confirmation', "Êtes-vous sûr de vouloir lancer\nl'apprentissage avec "+str(num)+" fichiers")
         if resp == 'yes' and not self.training:
-            self.startTrainingThread()
+            self.start_training_thread()
 
-    def onTrainingStop(self):
+    def on_training_stop(self):
+        """
+        Arrêt de l'entrainement (fermeture du dialogue)
+        """
         print('stopping')
         self.stoppingTraining=True
         self.waitingForStop = True
 
-    def loadWeights(self):
+    def load_weights(self):
+        """
+        Chargement des poids depuis un fichier *.dat
+        """
         # Crée le réseau
         if not self.reseau:
             self.status.update(0, 'Initialisation du réseau:')
@@ -211,7 +220,10 @@ class Interface(tk.Tk):
         else:
             print('Chargement non effectué')
 
-    def startTrainingThread(self):
+    def start_training_thread(self):
+        """
+        Démarrage du thread d'entrainement du réseau
+        """
         # changement des variables d'état
         self.training = True                    # alerte le reste du widget
         self.stoppingTraining = False
@@ -224,19 +236,19 @@ class Interface(tk.Tk):
                 fileList.extend([art+'/'+n for n in self.selectedFiles.files[art]])
         self.trainingThread = threading.Thread(target=lambda :self._train(fileList))
 
-        self.readingThread = threading.Thread(target=lambda :self._loadData(fileList))
+        self.readingThread = threading.Thread(target=lambda :self._load_data(fileList))
 
         # configuration du dialogue de progression
         self.trainingDialog = TrainingDialog(self)
-        self.trainingDialog.setFileQty(len(fileList)+1)
-        self.trainingDialog.protocol('WM_DELETE_WINDOW', self.onTrainingStop)
+        self.trainingDialog.set_file_qty(len(fileList) + 1)
+        self.trainingDialog.protocol('WM_DELETE_WINDOW', self.on_training_stop)
 
         # lancement
-        self.after(100, self.periodicJoiner)
+        self.after(100, self.periodic_joiner)
         self.trainingThread.start()
         self.readingThread.start()
 
-    def startCreation(self):
+    def start_creation(self):
         """
         Démarre la fabrication d'un morceau par le réseau
         """
@@ -246,9 +258,9 @@ class Interface(tk.Tk):
         self.creationFinished = False
         self.creationThread = threading.Thread(target=self._create)
         self.creationThread.start()
-        self.after(100, self.periodicCreateJoiner)
+        self.after(100, self.periodic_create_joiner)
 
-    def periodicJoiner(self):
+    def periodic_joiner(self):
         """
         Callback automatique de l'interface appellé toutes les 100ms
         qui essaye de rejoindre le thread d'entrainement
@@ -262,15 +274,19 @@ class Interface(tk.Tk):
             self.training = False
             self.btTrain.config(state=tk.ACTIVE)
         else:
-            self.after(100, self.periodicJoiner)
+            self.after(500, self.periodic_joiner)
 
-    def periodicCreateJoiner(self):
+    def periodic_create_joiner(self):
+        """
+        Callback automatique de l'interface appellé toutes les 100ms
+        qui essaye de rejoindre le thread de création
+        """
         if self.creationFinished:
             self.creationThread.join()
         else:
-            self.after(100, self.periodicCreateJoiner)
+            self.after(500, self.periodic_create_joiner)
 
-    def _loadData(self, fileList):
+    def _load_data(self, fileList):
         """
         Fonction dans un thread séparé de chargement des données
         """
@@ -296,19 +312,19 @@ class Interface(tk.Tk):
         """
         # Crée le réseau
         if not self.reseau:
-            self.trainingDialog.updateFile('Initialisation du réseau',-1)
+            self.trainingDialog.update_file('Initialisation du réseau',-1)
             self.status.update(0, 'Initialisation du réseau')
 
             self.reseau = LSTM(131, 0.1, True)
             self.reseau.add_lstm_layer(131)
             self.reseau.add_simple_layer(131)
-            self.reseau.graph.debug_print = lambda t: self.trainingDialog.updateAdv(t, 0)
+            self.reseau.graph.debug_print = lambda t: self.trainingDialog.update_adv(t, 0)
             # TODO: connect progressbar
             self.reseau.init_graph()
 
         # Utilise les données
         if not self.stoppingTraining:
-            self.trainingDialog.updateAdv('Chargement des données',-1)
+            self.trainingDialog.update_adv('Chargement des données',-1)
         else:
             print('STOP!')
             self.waitingForStop = False
@@ -316,8 +332,8 @@ class Interface(tk.Tk):
         for i in range(len(fileList)):
             # màj les informations du dialog
             name = fileList[i]
-            self.trainingDialog.updateFile(name, i+1)
-            self.trainingDialog.updateAdv('Chargement', 0)
+            self.trainingDialog.update_file(name, i+1)
+            self.trainingDialog.update_adv('Chargement', 0)
             self.status.update((i+1)*100/(len(fileList)+1), 'Entrainement...')
             # attend d'avoir des données disponibles
             while len(self.dataQueue) == 0:
@@ -377,31 +393,3 @@ class Interface(tk.Tk):
 if __name__ == '__main__':
     win = Interface()
     win.mainloop()
-    
-## tests
-'''
-    
-m = midi.MidiFile()
-# m.open('musics/format 0/albeniz/alb_esp2_format0.mid')
-# m.open('musics/format 0/clementi/clementi_opus36_1_1_format0.mid')
-m.open('musics/format 0/chopin/chpn_op25_e1_format0.mid')
-m.read()
-m.close()
-
-print(m.tracks[0])
-    
-# étendue des notes
-lowK = min(e.pitch for e in m.tracks[0].events if e.type == 'NOTE_ON')
-highK = max(e.pitch for e in m.tracks[0].events if e.type == 'NOTE_ON')
-print('range:',lowK,'-',highK)
-
-# évenements de pédale
-if e.type == 'CONTROLLER_CHANGE':
-    if e.pitch == 64:
-        events.append(e)
-tx = ''
-for e in events:
-    tx += str(e)+'\n'
-print(tx[:-1])
-
-'''
