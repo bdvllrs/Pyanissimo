@@ -3,6 +3,7 @@
 import numpy as np
 from theano import function, shared, scan, config, scan_module
 from theano.ifelse import ifelse
+import theano.printing as pr 
 import theano.tensor as T
 import pickle
 
@@ -16,6 +17,7 @@ class LSTMGraph:
         self.learning_rate = learning_rate
         self.bptt_truncate = bptt_truncate
         self.debug = debug
+        self.print_callback = pr._print_fn
         self.train = lambda: print('Utiliser init_train pour activer cette fonction.')
         self.cost = lambda: print('Utiliser init_train pour activer cette fonction.')
         self.BPTT = lambda: print('Utiliser init_train pour activer cette fonction.')
@@ -24,8 +26,7 @@ class LSTMGraph:
         self.layers = []  # Contient toutes les couches : tailles, poids, biases
         self.add_input_layer(self.nb_inputs)  # On ajoute la première couche
 
-        self.weights = {}
-        self.biases = {}
+        self.predict_stopping_condition = lambda a, b: T.ge(a[-1], 0.6)
 
     def add_layer(self, length, layer_type, **params):
         """
@@ -254,9 +255,10 @@ class LSTMGraph:
         args = list(args)
         num_arg = 0
         outputs = []
+        # debug_printing = self.print_callback('Activation du réseau...')
         for k in range(len(self.layers)):
             layer = self.layers[k]
-
+            # res = debug_printing(k)
             if layer['type'] == 'simple':  # si c'est un simple on utilise le model simple
                 x = self.model_simple_layer(x, k)
             elif layer['type'] == 'lstm':  # sinon celui de lstm
@@ -276,21 +278,9 @@ class LSTMGraph:
         """
         args = list(args)
         stop_condition = args[-1]
-        num_arg = 0
-        outputs = []
-        for k in range(len(self.layers)):
-            layer = self.layers[k]
-
-            if layer['type'] == 'simple':  # si c'est un simple on utilise le model simple
-                x = self.model_simple_layer(x, k)
-            elif layer['type'] == 'lstm':  # sinon celui de lstm
-                h, c = self.model_lstm_layer(x, args[num_arg], args[num_arg+1], k)
-                x = h  # la sortie est h
-                num_arg += 2
-                outputs.append(h)  # nouveau h
-                outputs.append(c)  # nouveau x
-        outputs = [x] + outputs  # les sorties sont la sortie finale x et les valeurs intermédiaires à repasser au réseau au temps suivant
-        cond = T.eq(T.argmax(x), T.argmax(stop_condition))
+        outputs = list(self.model_layers(x, *args))
+        # cond = T.eq(T.argmax(x), T.argmax(stop_condition))
+        cond = self.predict_stopping_condition(x, stop_condition)
         return tuple(outputs), scan_module.until(cond)  # x (output), vals_t, ..., condition d'arret
 
     def model_simple_layer(self, x, num_layer):
@@ -377,4 +367,20 @@ class LSTMGraph:
         :param size: taille
         """
         self.nb_inputs = size
+        return self
+
+    def set_print_callback(self, fn):
+        """
+        Change printing callback in theano
+        :param fn: function to use fn(op, xin)
+        """
+        self.print_callback = fn
+        return self
+
+    def set_predict_stopping_condition(self, fn):
+        """
+        Change theano stopping condition
+        :param fn: function f(a, b)
+        """
+        self.predict_stopping_condition = fn
         return self
