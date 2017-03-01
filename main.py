@@ -7,6 +7,7 @@ import os
 import threading
 import file
 import time
+import random
 from LSTM import LSTM
 
 
@@ -125,6 +126,57 @@ class TrainingDialog(tk.Toplevel):
         self.progAdvValue.set(num)
 
 
+class NumberEntry(tk.Frame):
+    """
+    Widget contenant un label et un Entry limité aux nombres,
+    avec minval <= x < maxval
+    """
+    def __init__(self, parent, text='', minval=0, maxval=10000, defaultval=1, numtype='int'):
+        tk.Frame.__init__(self, parent)
+
+        self.minval = minval
+        self.maxval = maxval
+        self.defaultval = defaultval
+        self.numtype = numtype
+
+        self.label = tk.Label(self, text=text)
+        self.label.pack(side=tk.LEFT)
+
+        validatecommand = self.register(self.validate_entry)
+        self.entry = tk.Entry(self, validate='key', validatecommand=(validatecommand, '%S', '%V'))
+        self.entry.pack(side=tk.LEFT)
+        if self.validate_entry(defaultval, 'init'):
+            self.entry.insert(0, str(defaultval))
+
+    def get_value(self):
+        """
+        Valeur numérique entrée
+        """
+        if self.numtype == 'int':
+            return int(self.entry.get())
+        elif self.numtype == 'float':
+            return float(self.entry.get())
+        raise ValueError('Numeric type not supported')
+
+    def validate_entry(self, newtext, reason):
+        """
+        Validate a change in the Entry widget
+        """
+        if reason == 'forced': # changement de la variable interne à l'Entry
+            return True
+
+        try:
+            if self.numtype == 'int':
+                val = int(newtext)
+            elif self.numtype == 'float':
+                val = float(newtext)
+            else:
+                return False
+        except ValueError:
+            return False
+        return self.minval <= val < self.maxval
+
+
 class Interface(tk.Tk):
     """
     Widget principal de l'application
@@ -143,13 +195,19 @@ class Interface(tk.Tk):
         # self.btSave.pack()
 
         self.btTrain = tk.Button(self.cmdFrame, text="Commencer l'entrainement", command=self.confirm_train)
-        self.btTrain.pack()
+        self.btTrain.pack(fill=tk.X, expand=True)
 
         self.btCreate = tk.Button(self.cmdFrame, text="Ecrire la musique", command=self.start_creation)
-        self.btCreate.pack()
+        self.btCreate.pack(fill=tk.X, expand=True)
 
         self.btLoad = tk.Button(self.cmdFrame, text='Charger des poids', command=self.load_weights)
-        self.btLoad.pack()
+        self.btLoad.pack(fill=tk.X, expand=True)
+
+        self.entryEpoch = NumberEntry(self.cmdFrame, text='Nombre d\'époques', minval=1, maxval=1000, defaultval=10, numtype='int')
+        self.entryEpoch.pack()
+
+        self.entrySpeed = NumberEntry(self.cmdFrame, text='Vitesse d\'aprentissage', minval=0., maxval=1., defaultval=0.1, numtype='float')
+        self.entrySpeed.pack()
         
         # sélection des fichiers
         self.selectedFiles = FileSelector(self)
@@ -176,6 +234,23 @@ class Interface(tk.Tk):
 
         self.reseau = None
 
+    def init_reseau(self, custom_update=None):
+        """
+        Initialise le réseau LSTM
+        """
+        def update(t):
+            self.status.update(0, 'Initialisation du réseau:'+t)
+            print('Initialisation du réseau:'+t)
+            if custom_update:
+                custom_update(t)
+        update('')
+        self.reseau = LSTM(131, self.entrySpeed.get_value(), True)
+        self.reseau.add_lstm_layer(131)
+        self.reseau.add_simple_layer(131)
+        self.reseau.graph.debug_print = update
+        self.reseau.init_graph()
+        update('Terminée')
+
     def confirm_train(self):
         """
         Affiche une boite de confirmation de démarrage de l'apprentissage
@@ -200,14 +275,7 @@ class Interface(tk.Tk):
         """
         # Crée le réseau
         if not self.reseau:
-            self.status.update(0, 'Initialisation du réseau:')
-
-            self.reseau = LSTM(131, 0.1, True)
-            self.reseau.add_lstm_layer(131)
-            self.reseau.add_simple_layer(131)
-            self.reseau.graph.debug_print = lambda t: print('Initialisation du réseau:'+t)
-            # TODO: connect progressbar
-            self.reseau.init_graph()
+            self.init_reseau()
 
         # demande le fichier
         filename = tk.filedialog.askopenfilename(defaultextension='.dat',
@@ -228,6 +296,8 @@ class Interface(tk.Tk):
         self.training = True                    # alerte le reste du widget
         self.stoppingTraining = False
         self.btTrain.config(state=tk.DISABLED)  # empèche un nouveau clic
+        self.btLoad.config(state=tk.DISABLED)
+        self.btCreate.config(state=tk.DISABLED)
 
         # configuration du thread
         fileList = []
@@ -273,6 +343,8 @@ class Interface(tk.Tk):
             self.trainingDialog.destroy()
             self.training = False
             self.btTrain.config(state=tk.ACTIVE)
+            self.btLoad.config(state=tk.ACTIVE)
+            self.btCreate.config(state=tk.ACTIVE)
         else:
             self.after(500, self.periodic_joiner)
 
@@ -290,20 +362,21 @@ class Interface(tk.Tk):
         """
         Fonction dans un thread séparé de chargement des données
         """
-        for name in fileList:
-            # attend d'avoir à charger un fichier
-            while self.dataSpace == 0 and not self.stoppingTraining:
-                time.sleep(0.1)
-            if self.stoppingTraining:
-                print('DATA STOP')
-                return
-            # lis le fichier
-            data = file.loadFile('musics/format 0/'+name)
-            # charge les données dans la file
-            self.dataLock.acquire()
-            self.dataQueue.append(data)
-            self.dataSpace -= 1
-            self.dataLock.release()
+        for k in range(self.entryEpoch.get_value()):
+            for name in random.shuffle(fileList):
+                # attend d'avoir à charger un fichier
+                while self.dataSpace == 0 and not self.stoppingTraining:
+                    time.sleep(0.1)
+                if self.stoppingTraining:
+                    print('DATA STOP')
+                    return
+                # lis le fichier
+                data = file.loadFile('musics/format 0/'+name)
+                # charge les données dans la file
+                self.dataLock.acquire()
+                self.dataQueue.append(data)
+                self.dataSpace -= 1
+                self.dataLock.release()
         return
 
     def _train(self, fileList):
@@ -312,15 +385,7 @@ class Interface(tk.Tk):
         """
         # Crée le réseau
         if not self.reseau:
-            self.trainingDialog.update_file('Initialisation du réseau',-1)
-            self.status.update(0, 'Initialisation du réseau')
-
-            self.reseau = LSTM(131, 0.1, True)
-            self.reseau.add_lstm_layer(131)
-            self.reseau.add_simple_layer(131)
-            self.reseau.graph.debug_print = lambda t: self.trainingDialog.update_adv(t, 0)
-            # TODO: connect progressbar
-            self.reseau.init_graph()
+            self.init_reseau(lambda t: self.trainingDialog.update_file('Initialisation du réseau:'+t, -1))
 
         # Utilise les données
         if not self.stoppingTraining:
@@ -329,34 +394,34 @@ class Interface(tk.Tk):
             print('STOP!')
             self.waitingForStop = False
             return
-        for i in range(len(fileList)):
-            # màj les informations du dialog
-            name = fileList[i]
-            self.trainingDialog.update_file(name, i+1)
-            self.trainingDialog.update_adv('Chargement', 0)
-            self.status.update((i+1)*100/(len(fileList)+1), 'Entrainement...')
-            # attend d'avoir des données disponibles
-            while len(self.dataQueue) == 0:
-                time.sleep(0.1)
-            if self.stoppingTraining:
-                print('STOP!')
-                self.waitingForStop = False
-                return
-            # récupère une page de donnée
-            self.dataLock.acquire()
-            data = self.dataQueue.pop(0)
-            self.dataSpace += 1
-            self.dataLock.release()
-            # transforme en entrées -> sorties
-            x = data[:-1]
-            y = data[1:]
+        for k in range(self.entryEpoch.get_value()):
+            for i in range(len(fileList)):
+                # màj les informations du dialog
+                self.trainingDialog.update_file(str(i+1), i+1)
+                self.trainingDialog.update_adv('Chargement', 0)
+                self.status.update((i+1)*100/(len(fileList)+1), 'Entrainement...')
+                # attend d'avoir des données disponibles
+                while len(self.dataQueue) == 0:
+                    time.sleep(0.1)
+                if self.stoppingTraining:
+                    print('STOP!')
+                    self.waitingForStop = False
+                    return
+                # récupère une page de donnée
+                self.dataLock.acquire()
+                data = self.dataQueue.pop(0)
+                self.dataSpace += 1
+                self.dataLock.release()
+                # transforme en entrées -> sorties
+                x = data[:-1]
+                y = data[1:]
+                # entraine
+                self.reseau.graph.train(x, y, self.reseau.learning_rate)
 
-            self.reseau.graph.train(x, y, self.reseau.learning_rate)
-
-            if self.stoppingTraining:
-                print('STOP!')
-                self.waitingForStop = False
-                return
+                if self.stoppingTraining:
+                    print('STOP!')
+                    self.waitingForStop = False
+                    return
 
         # sauvegarde le réseau
         print('Saving')
