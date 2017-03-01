@@ -14,8 +14,9 @@ def print_callback_fn(op, xin):
             pmsg = temp()
         else:
             pmsg = temp
-        if(op.message != '0'):
-            print(op.message)
+        pmsg = int(pmsg)
+        if pmsg%10 == 0:
+            print(pmsg)
 
 class LSTMGraph:
     def __init__(self, nb_inputs=None, learning_rate=0.01, bptt_truncate=-1, debug=False):
@@ -36,7 +37,7 @@ class LSTMGraph:
         self.layers = []  # Contient toutes les couches : tailles, poids, biases
         self.add_input_layer(self.nb_inputs)  # On ajoute la première couche
 
-        self.predict_stopping_condition = lambda a, b: T.ge(a[-1], 0.6)
+        self.predict_stopping_condition = lambda a, b: T.ge(a[-1], 0.5)
 
     def add_layer(self, length, layer_type, **params):
         """
@@ -101,95 +102,105 @@ class LSTMGraph:
         if self.debug:
             print(text)
 
-    def init_graph(self):
+    def init_graph(self, callback=None):
         """
         Créé la fonction d'apprentissage
         :param T: longueur des inputs
         """
+        stop = False
         self.debug_print('Initialisation du graphe...')
+        if callback is not None:
+            stop = callback()
+        if not stop:
+            x = T.dmatrix()  # On créé un vecteur d'entrée de type double
+            expected = T.dmatrix('expected')  # Valeur attendue
+            learning_rate = T.scalar('learning_rate')  # vitesse d'apprentissage
+            num_passage = 0
 
-        x = T.dmatrix()  # On créé un vecteur d'entrée de type double
-        expected = T.dmatrix('expected')  # Valeur attendue
-        learning_rate = T.scalar('learning_rate')  # vitesse d'apprentissage
-        num_passage = shared(0)
+            outputs_info = [None] # paramètres évolutifs à fournir au model_layers, None correspond à la sortie finale du réseau qui n'a pas de valeur initiale
 
-        outputs_info = [None] # paramètres évolutifs à fournir au model_layers, None correspond à la sortie finale du réseau qui n'a pas de valeur initiale
+            for layer in self.layers:
+                if layer['type'] == 'lstm':
+                    outputs_info.append(T.zeros(layer['length']))  # h_prev
+                    outputs_info.append(T.zeros(layer['length']))  # c_prev
+            
+            outputs_info.append(num_passage)
 
-        for layer in self.layers:
-            if layer['type'] == 'lstm':
-                outputs_info.append(T.zeros(layer['length']))  # h_prev
-                outputs_info.append(T.zeros(layer['length']))  # c_prev
-        outputs_info.append(None)
+            self.debug_print('Définition de la structure des couches.')
 
-        self.debug_print('Définition de la structure des couches.')
+            outputs, updates = scan(  # On fait une boucle sur le model (dans le temps)
+                fn=self.model_layers,  # fonction appliqué à chaque étape
+                sequences=x,  # on boucle sur le nombre d'entrée
+                truncate_gradient=self.bptt_truncate,  # Nombre d'étape pour le truncate BPTT (backpropagation through time)
+                                                        # Si égale à -1, on utilise le BPTT classique
+                outputs_info=outputs_info # Initialisation des paramètres données à fn
+            )
 
-        outputs, updates = scan(  # On fait une boucle sur le model (dans le temps)
-            fn=self.model_layers,  # fonction appliqué à chaque étape
-            sequences=x,  # on boucle sur le nombre d'entrée
-            truncate_gradient=self.bptt_truncate,  # Nombre d'étape pour le truncate BPTT (backpropagation through time)
-                                                    # Si égale à -1, on utilise le BPTT classique
-            outputs_info=outputs_info, # Initialisation des paramètres données à fn
-            non_sequences=num_passage
-        )
+            last_output = outputs[0]  # Sortie finale, les autres sont les valeurs des mémoires intermédiaires
+            debug_print = outputs[-1]
 
-        last_output = outputs[0]  # Sortie finale, les autres sont les valeurs des mémoires intermédiaires
-        debug_print = outputs[-1]
+        if callback is not None:
+            stop = callback()
+        if not stop:
+            self.debug_print('Définition de la fonction d\'erreur.')
 
-        self.debug_print('Définition de la fonction d\'erreur.')
+            cost = T.sum(self.error(expected, last_output))  # Calul de l'erreur avec fonction d'entropie
 
-        cost = T.sum(self.error(expected, last_output))  # Calul de l'erreur avec fonction d'entropie
+            self.debug_print('Calcul des gradients.')
 
-        self.debug_print('Calcul des gradients.')
+            updates = []  # Modifs
+            grads = []  # Gradients
 
-        updates = []  # Modifs
-        grads = []  # Gradients
+            for k in range(len(self.layers)):
+                layer_type = self.layers[k]['type']
+                if layer_type != 'input': # pas de gradient pour l'entrée
+                    for w in self.layers[k]['weights'].keys():
+                        grads.append(T.grad(cost, self.layers[k]['weights'][w]))
+                        update = (self.layers[k]['weights'][w], self.layers[k]['weights'][w] - learning_rate * grads[-1])
+                        updates.append(update)  # Liste des modifs à faire pour la propagtion du gradient
 
-        for k in range(len(self.layers)):
-            layer_type = self.layers[k]['type']
-            if layer_type != 'input': # pas de gradient pour l'entrée
-                for w in self.layers[k]['weights'].keys():
-                    grads.append(T.grad(cost, self.layers[k]['weights'][w]))
-                    update = (self.layers[k]['weights'][w], self.layers[k]['weights'][w] - learning_rate * grads[-1])
-                    updates.append(update)  # Liste des modifs à faire pour la propagtion du gradient
+            self.debug_print('Compilation des fonctions BPTT et cost.')
 
-        self.debug_print('Compilation des fonctions BPTT et cost.')
+            self.BPTT = function([x, expected], grads)
+            self.cost = function([x, expected], cost)
+        if callback is not None:
+            stop = callback()
+        if not stop:
 
-        self.BPTT = function([x, expected], grads)
-        self.cost = function([x, expected], cost)
+            self.debug_print('Compilation de la fonction de prédiction.')
 
-        self.debug_print('Compilation de la fonction de prédiction.')
+            input = T.dvector()
+            arret = T.dvector()
+            max_temps = T.iscalar()
 
-        input = T.dvector()
-        arret = T.dvector()
-        max_temps = T.iscalar()
+            outputs_info = [input] # paramètres évolutifs à fournir au model_layers, None correspond à la sortie finale du réseau qui n'a pas de valeur initiale
 
-        outputs_info = [input] # paramètres évolutifs à fournir au model_layers, None correspond à la sortie finale du réseau qui n'a pas de valeur initiale
+            for layer in self.layers:
+                if layer['type'] == 'lstm':
+                    outputs_info.append(T.zeros(layer['length']))  # h_prev
+                    outputs_info.append(T.zeros(layer['length']))  # c_prev
 
-        for layer in self.layers:
-            if layer['type'] == 'lstm':
-                outputs_info.append(T.zeros(layer['length']))  # h_prev
-                outputs_info.append(T.zeros(layer['length']))  # c_prev
+            outputs_info.append(0)
 
-        outputs_info.append(None)
+            o, updated = scan(  # On fait une boucle sur le model (dans le temps)
+                fn=self.model_layers_predict,  # fonction appliqué à chaque étape
+                non_sequences=[num_passage, arret],  
+                outputs_info=outputs_info, # Initialisation des paramètres données à fn
+                n_steps=max_temps
+            )
+            o = o[0]
 
-        num_passage.set_value(0)
+            self.predict = function([input, arret, max_temps], o)  # Donne la prédiction à partir de l'entrée
+        if callback is not None:
+            stop = callback()
+        if not stop:
 
-        o, updated = scan(  # On fait une boucle sur le model (dans le temps)
-            fn=self.model_layers_predict,  # fonction appliqué à chaque étape
-            non_sequences=[num_passage, arret],  
-            outputs_info=outputs_info, # Initialisation des paramètres données à fn
-            n_steps=max_temps
-        )
-        o = o[0]
+            self.debug_print('Compilation de la fonction d\'apprentissage.')
 
-        self.predict = function([input, arret, max_temps], o)  # Donne la prédiction à partir de l'entrée
+            # Création de la fonction d'entrainement
+            self.train = function([x, expected, learning_rate], [cost, last_output, debug_print], updates=updates)
 
-        self.debug_print('Compilation de la fonction d\'apprentissage.')
-
-        # Création de la fonction d'entrainement
-        self.train = function([x, expected, learning_rate], [cost, last_output, debug_print], updates=updates)
-
-        self.debug_print('Graphe initialisé.')
+            self.debug_print('Graphe initialisé.')
 
         return self
 
@@ -275,7 +286,7 @@ class LSTMGraph:
         outputs = []
         num_passage = args[-1]
         for k in range(len(self.layers)):
-            debug_printing = pr.Print(str(num_passage.get_value()), global_fn=self.print_callback)(x)
+            debug_printing = pr.Print('Progress', global_fn=self.print_callback)(num_passage+1)
             layer = self.layers[k]
             if layer['type'] == 'simple':  # si c'est un simple on utilise le model simple
                 x = self.model_simple_layer(x, k)
@@ -286,8 +297,6 @@ class LSTMGraph:
                 outputs.append(h)  # nouveau h
                 outputs.append(c)  # nouveau x
         outputs = [x] + outputs  # les sorties sont la sortie finale x et les valeurs intermédiaires à repasser au réseau au temps suivant
-        
-        num_passage.set_value(num_passage.get_value()+1)  # On met à jour la valeur du numéro de passage
 
         outputs.append(debug_printing)
         return tuple(outputs)  # x (output), vals_t, ...
@@ -302,6 +311,8 @@ class LSTMGraph:
         stop_condition = args[-1]
         args = args[:-1]
         outputs = list(self.model_layers(x, *args))
+        out = outputs[0]
+        outputs[0] = T.concatenate([T.round(out[:-3]), [out[-3]], T.round(out[-2:])])
         # cond = T.eq(T.argmax(x), T.argmax(stop_condition))
         cond = self.predict_stopping_condition(x, stop_condition)
         return tuple(outputs), scan_module.until(cond)  # x (output), vals_t, ..., condition d'arret
