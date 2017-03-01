@@ -14,8 +14,9 @@ def print_callback_fn(op, xin):
             pmsg = temp()
         else:
             pmsg = temp
-        if(op.message != '0'):
-            print(op.message)
+        pmsg = int(pmsg)
+        if pmsg%10 == 0:
+            print(pmsg)
 
 class LSTMGraph:
     def __init__(self, nb_inputs=None, learning_rate=0.01, bptt_truncate=-1, debug=False):
@@ -36,7 +37,7 @@ class LSTMGraph:
         self.layers = []  # Contient toutes les couches : tailles, poids, biases
         self.add_input_layer(self.nb_inputs)  # On ajoute la première couche
 
-        self.predict_stopping_condition = lambda a, b: T.ge(a[-1], 0.6)
+        self.predict_stopping_condition = lambda a, b: T.ge(a[-1], 0.5)
 
     def add_layer(self, length, layer_type, **params):
         """
@@ -111,7 +112,7 @@ class LSTMGraph:
         x = T.dmatrix()  # On créé un vecteur d'entrée de type double
         expected = T.dmatrix('expected')  # Valeur attendue
         learning_rate = T.scalar('learning_rate')  # vitesse d'apprentissage
-        num_passage = shared(0)
+        num_passage = 0
 
         outputs_info = [None] # paramètres évolutifs à fournir au model_layers, None correspond à la sortie finale du réseau qui n'a pas de valeur initiale
 
@@ -119,7 +120,8 @@ class LSTMGraph:
             if layer['type'] == 'lstm':
                 outputs_info.append(T.zeros(layer['length']))  # h_prev
                 outputs_info.append(T.zeros(layer['length']))  # c_prev
-        outputs_info.append(None)
+        
+        outputs_info.append(num_passage)
 
         self.debug_print('Définition de la structure des couches.')
 
@@ -128,8 +130,7 @@ class LSTMGraph:
             sequences=x,  # on boucle sur le nombre d'entrée
             truncate_gradient=self.bptt_truncate,  # Nombre d'étape pour le truncate BPTT (backpropagation through time)
                                                     # Si égale à -1, on utilise le BPTT classique
-            outputs_info=outputs_info, # Initialisation des paramètres données à fn
-            non_sequences=num_passage
+            outputs_info=outputs_info # Initialisation des paramètres données à fn
         )
 
         last_output = outputs[0]  # Sortie finale, les autres sont les valeurs des mémoires intermédiaires
@@ -170,9 +171,7 @@ class LSTMGraph:
                 outputs_info.append(T.zeros(layer['length']))  # h_prev
                 outputs_info.append(T.zeros(layer['length']))  # c_prev
 
-        outputs_info.append(None)
-
-        num_passage.set_value(0)
+        outputs_info.append(0)
 
         o, updated = scan(  # On fait une boucle sur le model (dans le temps)
             fn=self.model_layers_predict,  # fonction appliqué à chaque étape
@@ -275,7 +274,7 @@ class LSTMGraph:
         outputs = []
         num_passage = args[-1]
         for k in range(len(self.layers)):
-            debug_printing = pr.Print(str(num_passage.get_value()), global_fn=self.print_callback)(x)
+            debug_printing = pr.Print('Progress', global_fn=self.print_callback)(num_passage+1)
             layer = self.layers[k]
             if layer['type'] == 'simple':  # si c'est un simple on utilise le model simple
                 x = self.model_simple_layer(x, k)
@@ -286,8 +285,6 @@ class LSTMGraph:
                 outputs.append(h)  # nouveau h
                 outputs.append(c)  # nouveau x
         outputs = [x] + outputs  # les sorties sont la sortie finale x et les valeurs intermédiaires à repasser au réseau au temps suivant
-        
-        num_passage.set_value(num_passage.get_value()+1)  # On met à jour la valeur du numéro de passage
 
         outputs.append(debug_printing)
         return tuple(outputs)  # x (output), vals_t, ...
@@ -302,6 +299,8 @@ class LSTMGraph:
         stop_condition = args[-1]
         args = args[:-1]
         outputs = list(self.model_layers(x, *args))
+        out = outputs[0]
+        outputs[0] = T.concatenate([T.round(out[:-3]), [out[-3]], T.round(out[-2:])])
         # cond = T.eq(T.argmax(x), T.argmax(stop_condition))
         cond = self.predict_stopping_condition(x, stop_condition)
         return tuple(outputs), scan_module.until(cond)  # x (output), vals_t, ..., condition d'arret
