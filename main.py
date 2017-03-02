@@ -25,7 +25,7 @@ class FileSelector(tk.Frame):
             self.enabled[opt] = tk.Variable()
             self.checks[opt] = tk.Checkbutton(self, text=opt+' ('+str(len(self.files[opt]))+')', variable=self.enabled[opt], bd=0, state=tk.ACTIVE)
             self.checks[opt].select()
-            self.checks[opt].deselect()
+            # self.checks[opt].deselect()
             self.checks[opt].pack(anchor=tk.W)
 
     def discover_files(self):
@@ -244,7 +244,9 @@ class Interface(tk.Tk):
             if custom_update:
                 custom_update(t)
         update('')
-        self.reseau.add_lstm_layer(131)
+        self.reseau.add_simple_layer(200)
+        self.reseau.add_lstm_layer(200)
+        self.reseau.add_lstm_layer(200)
         self.reseau.add_simple_layer(131)
         self.reseau.graph.debug_print = update
         self.reseau.init_graph()
@@ -388,7 +390,7 @@ class Interface(tk.Tk):
         if not fileList:
             return
         # Crée le réseau
-        if not self.reseau:
+        if not self.reseau.graph.is_init:
             self.init_reseau(lambda t: self.trainingDialog.update_file('Initialisation du réseau:'+t, -1))
 
         # Utilise les données
@@ -398,6 +400,7 @@ class Interface(tk.Tk):
             print('STOP!')
             self.waitingForStop = False
             return
+        num_ex = 0
         for k in range(self.entryEpoch.get_value()):
             for i in range(len(fileList)):
                 # attend d'avoir des données disponibles
@@ -422,6 +425,9 @@ class Interface(tk.Tk):
                 y = data[1:]
                 # entraine
                 self.reseau.graph.train(x, y, self.reseau.learning_rate)
+                if num_ex % 20 == 0:  # Sauvegarde le résultat tous les 10 exemples
+                    self.reseau.save_weights('data/snapshots/snapshot_' + str(num_ex) + '.dat')
+                num_ex += 1
 
                 if self.stoppingTraining:
                     print('STOP!')
@@ -430,7 +436,7 @@ class Interface(tk.Tk):
 
         # sauvegarde le réseau
         print('Saving')
-        self.reseau.save_weights('data/snapshot.dat')
+        self.reseau.save_weights('data/final_weights.dat')
         
         print('END!')
         self.stoppingTraining = True
@@ -442,7 +448,7 @@ class Interface(tk.Tk):
         Fonction qui tourne dans un thread séparé et génère une musique
         """
         # check d'existence du réseau
-        if not self.reseau:
+        if not self.reseau.is_init:
             self.creationFinished = True
             print('pas de réseau :-(')
             return

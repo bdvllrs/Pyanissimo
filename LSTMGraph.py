@@ -35,6 +35,8 @@ class LSTMGraph:
         self.BPTT = lambda: print('Utiliser init_train pour activer cette fonction.')
         self.predict = lambda: print('Utiliser init_train pour activer cette fonction.')
 
+        self.is_init = False
+
         self.layers = []  # Contient toutes les couches : tailles, poids, biases
         self.add_input_layer(self.nb_inputs)  # On ajoute la première couche
 
@@ -202,6 +204,8 @@ class LSTMGraph:
             self.train = function([x, expected, learning_rate], [cost, last_output, debug_print], updates=updates)
 
             self.debug_print('Graphe initialisé.')
+
+        self.is_init = True
 
         return self
 
