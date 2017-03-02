@@ -312,8 +312,8 @@ class LSTMGraph:
         stop_condition = args[-1]
         args = args[:-1]
         outputs = list(self.model_layers(x, *args))
-        out = outputs[0]
-        outputs[0] = T.concatenate([T.round(out[:-3]), [out[-3]], T.round(out[-2:-1]), [out[-1]]])
+        # out = outputs[0]
+        # outputs[0] = T.concatenate([T.round(out[:-3]), [out[-3]], T.round(out[-2:-1]), [out[-1]]])
         # cond = T.eq(T.argmax(x), T.argmax(stop_condition))
         cond = self.predict_stopping_condition(outputs[0], stop_condition)
         return tuple(outputs), scan_module.until(cond)  # x (output), vals_t, ..., condition d'arret
