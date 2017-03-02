@@ -16,7 +16,8 @@ def print_callback_fn(op, xin):
             pmsg = temp
         pmsg = int(pmsg)
         if pmsg%10 == 0:
-            print(pmsg)
+            pass
+            #print(pmsg)
 
 class LSTMGraph:
     def __init__(self, nb_inputs=None, learning_rate=0.01, bptt_truncate=-1, debug=False):
@@ -37,7 +38,7 @@ class LSTMGraph:
         self.layers = []  # Contient toutes les couches : tailles, poids, biases
         self.add_input_layer(self.nb_inputs)  # On ajoute la première couche
 
-        self.predict_stopping_condition = lambda a, b: T.ge(a[-1], 0.5)
+        self.predict_stopping_condition = lambda a, b: T.ge(a[-1], 0.7)
 
     def add_layer(self, length, layer_type, **params):
         """
@@ -312,7 +313,7 @@ class LSTMGraph:
         args = args[:-1]
         outputs = list(self.model_layers(x, *args))
         out = outputs[0]
-        outputs[0] = T.concatenate([T.round(out[:-3]), [out[-3]], T.round(out[-2:])])
+        outputs[0] = T.concatenate([T.round(out[:-3]), [out[-3]], T.round(out[-2:-1]), [out[-1]]])
         # cond = T.eq(T.argmax(x), T.argmax(stop_condition))
         cond = self.predict_stopping_condition(outputs[0], stop_condition)
         return tuple(outputs), scan_module.until(cond)  # x (output), vals_t, ..., condition d'arret
