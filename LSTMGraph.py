@@ -73,7 +73,7 @@ class LSTMGraph:
         :param biases: poids à donner aux biases
         :param params: possibles : activation_function (defaut 'sigmoid' | 'tanh')
         """
-        nb = self.add_layer(length, 'simple')
+        nb = self.add_layer(length, 'simple', **params)
         self.init_simple_layer_weights(nb, weights, biases)
         return self
 
@@ -84,7 +84,7 @@ class LSTMGraph:
         :param weights: poids à donner (défaut générés aléatoirements)
         :param biases: poids à donner aux biases
         """
-        nb = self.add_layer(length, 'lstm')
+        nb = self.add_layer(length, 'lstm', **params)
         self.init_lstm_layer_weights(nb, weights, biases)
         return self
 
@@ -346,6 +346,25 @@ class LSTMGraph:
         c = f * c_prev + i * T.tanh(T.dot(x, self.layers[num_layer]['weights']['Wc']) + T.dot(h_prev, self.layers[num_layer]['weights']['Uc']) + self.layers[num_layer]['biases']['bc'])
         h = o * T.tanh(c)
         return h, c
+
+    def get_weights(self):
+        """
+        Récupère les poids en cours
+        """
+        layers = []
+        for layer in self.layers:
+            layers.append({
+                'length': layer['length'],
+                'weights': {},
+                'biases': {},
+                'type': layer['type'],
+                'params': layer['params']
+            })
+            for w, val in layer['weights'].items():
+                layers[-1]['weights'][w] = val.get_value()
+            for w, val in layer['biases'].items():
+                layers[-1]['biases'][w] = val.get_value()
+        return layers
 
     def save_weights(self, file):
         """

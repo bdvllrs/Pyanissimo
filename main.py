@@ -232,7 +232,7 @@ class Interface(tk.Tk):
         self.creationThread = None
         self.creationFinished = True
 
-        self.reseau = None
+        self.reseau = LSTM(131, self.entrySpeed.get_value(), True)
 
     def init_reseau(self, custom_update=None):
         """
@@ -244,7 +244,6 @@ class Interface(tk.Tk):
             if custom_update:
                 custom_update(t)
         update('')
-        self.reseau = LSTM(131, self.entrySpeed.get_value(), True)
         self.reseau.add_lstm_layer(131)
         self.reseau.add_simple_layer(131)
         self.reseau.graph.debug_print = update
@@ -273,9 +272,6 @@ class Interface(tk.Tk):
         """
         Chargement des poids depuis un fichier *.dat
         """
-        # Crée le réseau
-        if not self.reseau:
-            self.init_reseau()
 
         # demande le fichier
         filename = tk.filedialog.askopenfilename(defaultextension='.dat',
@@ -284,6 +280,7 @@ class Interface(tk.Tk):
         # charge les poids
         if filename:
             self.reseau.load_weights(filename)
+            self.init_reseau()
             print('Chargement terminé!')
         else:
             print('Chargement non effectué')
