@@ -14,6 +14,7 @@ def loadFile(name, step=10, timeLimit=-1):
     m.read()
     m.close()
 
+    # print(m.tracks[0])
     # conversion en notes jouées toutes les <step> ms
     noteTimeline = {}
     currentNotes = {p: [-1, 0] for p in range(128)}
@@ -215,7 +216,14 @@ def makeFile(data, filename, step=10):
 
 if __name__ == '__main__':
     print('load file')
-    data = loadFile('musics/format 0/albeniz/alb_esp1_format0.mid')
+    # data = loadFile('musics/format 0/albeniz/alb_esp1_format0.mid')
+    data = []
+
+    for k in range(0, 120, 1):
+        data += [[1*(i==k) for i in range(131)]]*10
+    for i in range(len(data)):
+        data[i][128] = 0.8
+    print(data)
     print('write file')
     makeFile(data, 'test.mid')
     print('written!')
