@@ -448,7 +448,7 @@ class Interface(tk.Tk):
         Fonction qui tourne dans un thread séparé et génère une musique
         """
         # check d'existence du réseau
-        if not self.reseau.is_init:
+        if not self.reseau.graph.is_init:
             self.creationFinished = True
             print('pas de réseau :-(')
             return
