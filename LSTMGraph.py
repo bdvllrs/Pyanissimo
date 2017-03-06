@@ -60,7 +60,6 @@ class LSTMGraph:
             'weights': {},
             'biases' : {}
         }
-        self.layers.append(layer)
         return len(self.layers)-1
 
     def add_input_layer(self, nb_inputs):
@@ -395,7 +394,10 @@ class LSTMGraph:
         Utilise les fichiers pour initialiser les poids
         """
         layers = pickle.load(open(file, 'rb'))
+
         self.layers = []
+        self.add_input_layer(self.nb_inputs)  # On ajoute la première couche
+
         for layer in layers:
             if layer['type'] == 'lstm':
                 self.add_lstm_layer(layer['length'], layer['weights'], layer['biases'])
