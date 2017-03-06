@@ -72,6 +72,9 @@ def makeFile(data, filename, step=10000):
     """
     écrit un fichier à partir d'une liste échantillonée de notes
     """
+    # ajout d'une frame vide pour l'arrêt des notes
+    data += [0 for i in range(131)]
+    # création du fichier
     m = midi.MidiFile()
 
     m.ticksPerQuarterNote = 480

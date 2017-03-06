@@ -310,7 +310,7 @@ class Interface(tk.Tk):
 
         # configuration du dialogue de progression
         self.trainingDialog = TrainingDialog(self)
-        self.trainingDialog.set_file_qty((len(fileList)+1)*(self.entryEpoch.get_value()+1))
+        self.trainingDialog.set_file_qty((len(fileList)+1)*self.entryEpoch.get_value())
         self.trainingDialog.protocol('WM_DELETE_WINDOW', self.on_training_stop)
 
         # lancement
@@ -455,6 +455,7 @@ class Interface(tk.Tk):
         print('Start generation')
         # génère la musique
         frames = self.reseau.predict([1*(i==129) for i in range(128+3)], [0], 50000)
+        frames = frames.tolist()
         # fixe à 0 ou 1 les notes
         for n in range(len(frames)):
             for i in range(128):
