@@ -2,9 +2,12 @@ import midi
 import numpy as np
 
 
-def loadFile(name, step=10):
+def loadFile(name, step=10, timeLimit=-1):
     """
     Charge un fichier, et le converti en tableau de notes échantillonées
+    :param step: pas de quantification de la musique (ms)
+    :param timeLimit: temps total limite de la musique (ms)
+                      ignoré si négatif
     """
     m = midi.MidiFile()
     m.open(name)
@@ -18,12 +21,12 @@ def loadFile(name, step=10):
     lastTempoTimeMicro = 0
     lastTempoTimeTick = 0
     for e in m.tracks[0].events:
-        if e.type == 'SET_TEMPO': # changement de tempo dans la piste
+        if e.type == 'SET_TEMPO':  # changement de tempo dans la piste
             t = (e.time-lastTempoTimeTick)*currentTempo/m.ticksPerQuarterNote + lastTempoTimeMicro # durée en µs
             currentTempo = e.data
             lastTempoTimeMicro = t
             lastTempoTimeTick = e.time
-        elif e.type == 'NOTE_ON': # début/fin d'une note
+        elif e.type == 'NOTE_ON':  # début/fin d'une note
             t = (e.time-lastTempoTimeTick)*currentTempo/m.ticksPerQuarterNote + lastTempoTimeMicro # durée en µs
             n = int( t/(step*1000) )
             if e.velocity != 0:
@@ -35,7 +38,7 @@ def loadFile(name, step=10):
                     continue
                 for k in range(currentNotes[e.pitch][0], n):
                     if k not in noteTimeline:
-                        noteTimeline[k] = [] # ajout de la clé de temps <k>
+                        noteTimeline[k] = []  # ajout de la clé de temps <k>
                     vel = currentNotes[e.pitch][1]
                     noteTimeline[k].append( (e.pitch, vel) )
                 currentNotes[e.pitch] = [-1, 0]
@@ -53,22 +56,32 @@ def loadFile(name, step=10):
     # trim les étapes vides au début
     while all(tm == 0 for tm in timeline[0]):
         timeline.pop(0)
-    # trim les étapes vides à la fin
-    while all(tm == 0 for tm in timeline[-1]):
-        timeline.pop()
+    # trim les étapes selon la limite de temps
+    if timeLimit < 0:
+        # trim les étapes vides à la fin
+        while all(tm == 0 for tm in timeline[-1]):
+            timeline.pop()
+    else:
+        # trim les étapes jusqu'à la limite de temps
+        timeline = timeline[:timeLimit/step]
 
     # signaux de début et fin
-    timeline= [[1*(i==129) for i in range(128+3)]] + timeline + [[1*(i==130) for i in range(128+3)]]
+    timeline = [[1*(i==129) for i in range(128+3)]] + timeline + [[1*(i==130) for i in range(128+3)]]
     return np.asarray(timeline)
 
+
 def to3bytes(num):
+    """
+    Converti un nombre en 3 octets
+    """
     L = []
     for i in range(3):
         L.append(num % 256)
         num = num >> 8
     return bytes(L[::-1])
 
-def makeFile(data, filename, step=10000):
+
+def makeFile(data, filename, step=10):
     """
     écrit un fichier à partir d'une liste échantillonée de notes
     """
@@ -139,7 +152,7 @@ def makeFile(data, filename, step=10000):
     e = midi.MidiEvent(tr)
     e.channel = None
     e.type = 'SET_TEMPO'
-    e.data = to3bytes(int(3*step*480/100)) # on choisi 30 ticks/frame, et 480 ticks/noire (limite au 1/8eme de croche)
+    e.data = to3bytes(int(3*step*480*10))  # on choisi 30 ticks/frame, et 480 ticks/noire (limite au 1/8eme de croche)
     tr.events.append(e)
     # ajout des notes
     currentlyPlaying = [0 for i in range(128)]
@@ -152,8 +165,6 @@ def makeFile(data, filename, step=10000):
             e = midi.DeltaTime(tr)
             e.time = 30*(n-lastChange)
             tr.events.append(e)
-            if n == 1:
-                print('time:',e.time)
             # note 0
             e = midi.MidiEvent(tr)
             e.channel = 1
@@ -210,5 +221,3 @@ if __name__ == '__main__':
     print('written!')
     dt = loadFile('test.mid')
 
-
-    
