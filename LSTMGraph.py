@@ -60,6 +60,7 @@ class LSTMGraph:
             'weights': {},
             'biases' : {}
         }
+        self.layers.append(layer)
         return len(self.layers)-1
 
     def add_input_layer(self, nb_inputs):
