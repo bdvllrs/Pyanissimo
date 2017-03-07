@@ -150,7 +150,7 @@ class Grapher(tk.Canvas):
             return
         elif all(len(self.curves[n][1]) <= 1 for n in self.curves):
             return
-        drawing = [n for n in self.curves if len(self.curves[n][2]) > 1]
+        drawing = [n for n in self.curves if len(self.curves[n][1]) > 1]
         # get size
         width = self.winfo_width()
         height = self.winfo_height()
