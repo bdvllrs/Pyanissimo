@@ -172,9 +172,9 @@ class LSTMGraph:
 
             self.debug_print('Compilation de la fonction de prédiction.')
 
-            input = T.dvector()
-            arret = T.dvector()
-            max_temps = T.iscalar()
+            input = T.vector(dtype=config.floatX)
+            arret = T.vector(dtype=config.floatX)
+            max_temps = T.scalar(dtype=config.intX)
 
             outputs_info = [input] # paramètres évolutifs à fournir au model_layers, None correspond à la sortie finale du réseau qui n'a pas de valeur initiale
 
@@ -279,6 +279,7 @@ class LSTMGraph:
             self.layers[layer]['weights'][w] = shared(weight.astype(config.floatX))
         for b, biase in biases.items():
             self.layers[layer]['biases'][b] = shared(biase.astype(config.floatX))
+
 
     def model_layers(self, x, *args):
         """
