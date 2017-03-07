@@ -115,8 +115,8 @@ class LSTMGraph:
         if callback is not None:
             stop = callback()
         if not stop:
-            x = T.dmatrix()  # On créé un vecteur d'entrée de type double
-            expected = T.dmatrix('expected')  # Valeur attendue
+            x = T.matrix('x', dtype=config.floatX)  # On créé un vecteur d'entrée de type double
+            expected = T.matrix('expected', dtype=config.floatX)  # Valeur attendue
             learning_rate = T.scalar('learning_rate')  # vitesse d'apprentissage
             num_passage = 0
 
@@ -302,7 +302,7 @@ class LSTMGraph:
                 outputs.append(h)  # nouveau h
                 outputs.append(c)  # nouveau x
         outputs = [x] + outputs  # les sorties sont la sortie finale x et les valeurs intermédiaires à repasser au réseau au temps suivant
-
+        pr.debugprint(outputs)
         outputs.append(debug_printing)
         return tuple(outputs)  # x (output), vals_t, ...
 
