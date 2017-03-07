@@ -25,7 +25,7 @@ class FileSelector(tk.Frame):
             self.enabled[opt] = tk.Variable()
             self.checks[opt] = tk.Checkbutton(self, text=opt+' ('+str(len(self.files[opt]))+')', variable=self.enabled[opt], bd=0, state=tk.ACTIVE)
             self.checks[opt].select()
-            # self.checks[opt].deselect()
+            self.checks[opt].deselect()
             self.checks[opt].pack(anchor=tk.W)
 
     def discover_files(self):
@@ -73,29 +73,147 @@ class StatusBar(tk.Frame):
             self.progressValue.set(int(clamp))
 
 
+class Grapher(tk.Canvas):
+    """
+    Widget dessinant un graphique
+
+    Utilisations types:
+        * Ajout d'une courbe toto de type 'simple'
+        * Ajout de n points x_i sur cette courbe
+        -> la courbe sera le tracé y = f(i) = x_i,
+           avec les axes x[0, xmax], y[0, n]
+
+        * Ajout d'une courbe tata de type 'point'
+        * Ajout de n points (x_i, y_i) sur cette courbe
+        -> la courbe sera le tracé des points reliés (x_i, y_i),
+           avec les axes x[xmin, xmax], y[ymin, ymax]
+        Dans le cas de plusieurs courbes, on prend l'interval le plus petit contennant toute les courbes
+    """
+    def __init__(self, parent, width, height, backColor='white'):
+        tk.Canvas.__init__(self, parent, width=width, height=height)
+        self.backColor = backColor
+        self.create_rectangle((0, 0), (width, height), fill=backColor)
+        self.curves = {}
+        self.absciss = ''
+
+    def add_curve(self, name, color, typ):
+        """
+        Ajoute une courbe à la liste des courbes
+        """
+        # vérifie le type
+        assert typ in ['simple', 'point'], "Type not recognised"
+        # vérifie l'axe des abscisses
+        if not self.absciss:
+            self.absciss = typ
+        assert typ == self.absciss, "Incompatible type"
+        # ajoute la courbe
+        self.curves[name] = [color, []]
+
+    def add_point(self, curvename, pt, redraw=True):
+        """
+        Ajoute un point à la courbe 'curvename'
+        """
+        if curvename not in self.curves:
+            return
+        self.curves[curvename][1].append(pt)
+        if redraw:
+            self.redraw()
+
+    def add_points(self, curvename, pointlist, redraw=True):
+        """
+        Ajoute plusieurs points à la courbe 'curvename'
+        """
+        for pt in pointlist:
+            self.add_point(curvename, pt, False)
+        if redraw:
+            self.redraw()
+
+    def map_scr(self, pt, xspan, yspan):
+        # get size
+        width = self.winfo_width()
+        height = self.winfo_height()
+        # unpack
+        x, y = pt
+        xmin, xmax = xspan
+        ymin, ymax = yspan
+        # map coords
+        xscr = int(width*(x-xmin)/(xmax-xmin))
+        yscr = height - int(height*(y-ymin)/(ymax-ymin))
+        return xscr, yscr
+
+    def redraw(self):
+        """
+        Redessine entièrement le graphique
+        """
+        # check existence
+        if len(self.curves) <= 0:
+            return
+        elif all(len(self.curves[n][1]) <= 1 for n in self.curves):
+            return
+        drawing = [n for n in self.curves if len(self.curves[n][2]) > 1]
+        # get size
+        width = self.winfo_width()
+        height = self.winfo_height()
+        # get x and y spans
+        if self.absciss == 'simple':
+            xspan = [0, max(len(self.curves[n][1]) for n in drawing)]
+            yspan = [0, max(self.curves[n][1] for n in drawing)]
+        elif self.absciss == 'point':
+            # take first point of a curve as initialisation point
+            first_x, first_y = self.curves[drawing[0]][1][0]
+            xspan = [first_x, first_x]
+            yspan = [first_y, first_y]
+            for n in drawing:
+                for x, y in self.curves[n][1]:
+                    xspan[0] = min(x, xspan[0])
+                    xspan[1] = max(x, xspan[1])
+                    yspan[0] = min(y, yspan[0])
+                    yspan[1] = max(y, yspan[1])
+        # clear previous drawings
+        self.delete('ALL')
+        # draw background
+        self.create_rectangle((0, 0), (width, height), fill=self.backColor)
+        # draw curves
+        for n in drawing:
+            x, y = self.map_scr(self.curves[n][1][0], xspan, yspan)
+            for nx, ny in self.curves[n][1][1:]:
+                nxs, nys = self.map_scr((nx, ny), xspan, yspan)
+                self.create_line((x, y), (nxs, nys), fill=self.curves[n][0])
+                x, y = nxs, nys
+
+
 class TrainingDialog(tk.Toplevel):
     def __init__(self, parent):
         tk.Toplevel.__init__(self, parent)
 
+        # frame de progression
+        self.progFrame = tk.Frame(self)
+        self.progFrame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
         # indicateur global
-        self.fileLabel = tk.Label(self, text='Fichier:')
+        self.fileLabel = tk.Label(self.progFrame, text='Fichier:')
         self.fileLabel.pack(anchor=tk.W)
         
         # barre de progression totale
         self.progFileValue = tk.IntVar()
         self.progFileMax = 0
-        self.progFile = ttk.Progressbar(self, orient=tk.HORIZONTAL, mode='determinate', length=400, variable=self.progFileValue)
+        self.progFile = ttk.Progressbar(self.progFrame, orient=tk.HORIZONTAL, mode='determinate', length=400, variable=self.progFileValue)
         self.progFile.pack(side=tk.TOP)
 
         # indicateur du fichier actuel
-        self.advLabel = tk.Label(self, text='Etape:')
+        self.advLabel = tk.Label(self.progFrame, text='Etape:')
         self.advLabel.pack(anchor=tk.W)
 
         # barre de progression du fichier actuel
         self.progAdvValue = tk.IntVar()
         self.progAdvMax = 0
-        self.progAdv = ttk.Progressbar(self, orient=tk.HORIZONTAL, mode='determinate', length=400, variable=self.progAdvValue)
+        self.progAdv = ttk.Progressbar(self.progFrame, orient=tk.HORIZONTAL, mode='determinate', length=400, variable=self.progAdvValue)
         self.progAdv.pack(side=tk.TOP)
+
+        # progression de l'erreur
+        self.errorGraph = Grapher(self, 300, 200)
+        self.errorGraph.pack(side=tk.RIGHT, anchor=tk.E)
+        self.errorGraph.add_curve('error', 'blue', 'simple')
         
     def set_file_qty(self, value):
         """
@@ -256,7 +374,6 @@ class Interface(tk.Tk):
         """
         Affiche une boite de confirmation de démarrage de l'apprentissage
         """
-        print([self.selectedFiles.enabled[f].get() for f in self.selectedFiles.enabled])
         num = sum(len(self.selectedFiles.files[f]) for f in self.selectedFiles.files if self.selectedFiles.enabled[f].get()=='1')
         resp = tk.messagebox.askquestion('Confirmation', "Êtes-vous sûr de vouloir lancer\nl'apprentissage avec "+str(num)+" fichiers")
         if resp == 'yes' and not self.training:
@@ -424,7 +541,8 @@ class Interface(tk.Tk):
                 x = data[:-1]
                 y = data[1:]
                 # entraine
-                self.reseau.graph.train(x, y, self.reseau.learning_rate)
+                cost, _, _ = self.reseau.graph.train(x, y, self.reseau.learning_rate)
+                self.trainingDialog.errorGraph.add_point('error', cost)
                 if num_ex % 20 == 0:  # Sauvegarde le résultat tous les 10 exemples
                     self.reseau.save_weights('data/snapshots/snapshot_' + str(num_ex) + '.dat')
                 num_ex += 1
