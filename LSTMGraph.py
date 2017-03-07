@@ -174,7 +174,7 @@ class LSTMGraph:
 
             input = T.vector(dtype=config.floatX)
             arret = T.vector(dtype=config.floatX)
-            max_temps = T.scalar(dtype=config.intX)
+            max_temps = T.iscalar()
 
             outputs_info = [input] # paramètres évolutifs à fournir au model_layers, None correspond à la sortie finale du réseau qui n'a pas de valeur initiale
 
