@@ -161,6 +161,10 @@ class LSTMGraph:
                         grads.append(T.grad(cost, self.layers[k]['weights'][w]))
                         update = (self.layers[k]['weights'][w], self.layers[k]['weights'][w] - learning_rate * grads[-1])
                         updates.append(update)  # Liste des modifs à faire pour la propagtion du gradient
+                    for w in self.layers[k]['biases'].keys():
+                        grads.append(T.grad(cost, self.layers[k]['biases'][w]))
+                        update = (self.layers[k]['biases'][w], self.layers[k]['biases'][w] - learning_rate * grads[-1])
+                        updates.append(update)  # Liste des modifs à faire pour la propagtion du gradient
 
             self.debug_print('Compilation des fonctions BPTT et cost.')
 

@@ -91,6 +91,8 @@ class Grapher(tk.Canvas):
     """
     def __init__(self, parent, width, height, backColor='white'):
         tk.Canvas.__init__(self, parent, width=width, height=height)
+        self.width = width
+        self.height = height
         self.backColor = backColor
         self.create_rectangle((0, 0), (width, height), fill=backColor)
         self.curves = {}
@@ -116,6 +118,8 @@ class Grapher(tk.Canvas):
         if curvename not in self.curves:
             return
         self.curves[curvename][1].append(pt)
+        if len(self.curves[curvename][1]) > 50:
+            self.curves[curvename][1].pop(0)
         if redraw:
             self.redraw()
 
@@ -129,16 +133,13 @@ class Grapher(tk.Canvas):
             self.redraw()
 
     def map_scr(self, pt, xspan, yspan):
-        # get size
-        width = self.winfo_width()
-        height = self.winfo_height()
         # unpack
         x, y = pt
         xmin, xmax = xspan
         ymin, ymax = yspan
         # map coords
-        xscr = int(width*(x-xmin)/(xmax-xmin))
-        yscr = height - int(height*(y-ymin)/(ymax-ymin))
+        xscr = int(self.width*(x-xmin)/(xmax-xmin))
+        yscr = self.height - int(self.height*(y-ymin)/(ymax-ymin))
         return xscr, yscr
 
     def redraw(self):
@@ -155,9 +156,10 @@ class Grapher(tk.Canvas):
         width = self.winfo_width()
         height = self.winfo_height()
         # get x and y spans
+        xspan, yspan = None, None
         if self.absciss == 'simple':
-            xspan = [0, max(len(self.curves[n][1]) for n in drawing)]
-            yspan = [0, max(self.curves[n][1] for n in drawing)]
+            xspan = [0, max(len(self.curves[n][1])-1 for n in drawing)]
+            yspan = [0, max(max(self.curves[n][1]) for n in drawing)]
         elif self.absciss == 'point':
             # take first point of a curve as initialisation point
             first_x, first_y = self.curves[drawing[0]][1][0]
@@ -174,12 +176,21 @@ class Grapher(tk.Canvas):
         # draw background
         self.create_rectangle((0, 0), (width, height), fill=self.backColor)
         # draw curves
-        for n in drawing:
-            x, y = self.map_scr(self.curves[n][1][0], xspan, yspan)
-            for nx, ny in self.curves[n][1][1:]:
-                nxs, nys = self.map_scr((nx, ny), xspan, yspan)
-                self.create_line((x, y), (nxs, nys), fill=self.curves[n][0])
-                x, y = nxs, nys
+        if self.absciss == 'simple':
+            for n in drawing:
+                x, y = self.map_scr((0, self.curves[n][1][0]), xspan, yspan)
+                for i in range(1, len(self.curves[n][1])):
+                    ny = self.curves[n][1][i]
+                    nxs, nys = self.map_scr((i, ny), xspan, yspan)
+                    self.create_line((x, y), (nxs, nys), fill=self.curves[n][0])
+                    x, y = nxs, nys
+        elif self.absciss == 'point':
+            for n in drawing:
+                x, y = self.map_scr(self.curves[n][1][0], xspan, yspan)
+                for nx, ny in self.curves[n][1][1:]:
+                    nxs, nys = self.map_scr((nx, ny), xspan, yspan)
+                    self.create_line((x, y), (nxs, nys), fill=self.curves[n][0])
+                    x, y = nxs, nys
 
 
 class TrainingDialog(tk.Toplevel):
@@ -324,7 +335,7 @@ class Interface(tk.Tk):
         self.entryEpoch = NumberEntry(self.cmdFrame, text='Nombre d\'époques', minval=1, maxval=1000, defaultval=10, numtype='int')
         self.entryEpoch.pack()
 
-        self.entrySpeed = NumberEntry(self.cmdFrame, text='Vitesse d\'aprentissage', minval=0., maxval=1., defaultval=0.1, numtype='float')
+        self.entrySpeed = NumberEntry(self.cmdFrame, text='Vitesse d\'aprentissage', minval=0., maxval=10.00001, defaultval=0.1, numtype='float')
         self.entrySpeed.pack()
         
         # sélection des fichiers
@@ -427,7 +438,7 @@ class Interface(tk.Tk):
 
         # configuration du dialogue de progression
         self.trainingDialog = TrainingDialog(self)
-        self.trainingDialog.set_file_qty((len(fileList)+1)*self.entryEpoch.get_value())
+        self.trainingDialog.set_file_qty(len(fileList)*self.entryEpoch.get_value()+1)
         self.trainingDialog.protocol('WM_DELETE_WINDOW', self.on_training_stop)
 
         # lancement
@@ -492,7 +503,7 @@ class Interface(tk.Tk):
                     print('DATA STOP')
                     return
                 # lis le fichier
-                data = file.loadFile('musics/format 0/'+name)
+                data = file.loadFile('musics/format 0/'+name, 10, 10000)
                 # charge les données dans la file
                 self.dataLock.acquire()
                 self.dataQueue.append( (name, data) )
@@ -507,8 +518,8 @@ class Interface(tk.Tk):
         if not fileList:
             return
         # Crée le réseau
-        if not self.reseau.graph.is_init:
-            self.init_reseau(lambda t: self.trainingDialog.update_file('Initialisation du réseau:'+t, -1))
+        # if not self.reseau.graph.is_init:
+        self.init_reseau(lambda t: self.trainingDialog.update_file('Initialisation du réseau:'+t, -1))
 
         # Utilise les données
         if not self.stoppingTraining:
@@ -530,9 +541,9 @@ class Interface(tk.Tk):
                 self.dataLock.release()
                 # màj les informations du dialog
                 tx = '(E:'+str(k+1)+'/'+str(self.entryEpoch.get_value())+' F:'+str(i+1)+'/'+str(len(fileList))+') '
-                self.trainingDialog.update_file(tx+name, (i+1)*(k+1))
+                self.trainingDialog.update_file(tx+name, i+len(fileList)*k+1)
                 self.trainingDialog.update_adv('Chargement', 0)
-                self.status.update((i+1)*(k+1)*100/((len(fileList)+1)*self.entryEpoch.get_value()), 'Entrainement...')
+                self.status.update((i+(len(fileList))*k)*100/(len(fileList)*self.entryEpoch.get_value()+1), 'Entrainement...')
                 if self.stoppingTraining:
                     print('STOP!')
                     self.waitingForStop = False
@@ -542,6 +553,7 @@ class Interface(tk.Tk):
                 y = data[1:]
                 # entraine
                 cost, _, _ = self.reseau.graph.train(x, y, self.reseau.learning_rate)
+                print('erreur :', cost)
                 self.trainingDialog.errorGraph.add_point('error', cost)
                 if num_ex % 20 == 0:  # Sauvegarde le résultat tous les 10 exemples
                     self.reseau.save_weights('data/snapshots/snapshot_' + str(num_ex) + '.dat')
@@ -572,7 +584,7 @@ class Interface(tk.Tk):
             return
         print('Start generation')
         # génère la musique
-        frames = self.reseau.predict([1*(i==129) for i in range(128+3)], [0], 50000)
+        frames = self.reseau.predict([1*(i==129) for i in range(128+3)], [0], 1000)
         frames = frames.tolist()
         # fixe à 0 ou 1 les notes
         for n in range(len(frames)):

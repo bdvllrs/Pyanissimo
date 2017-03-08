@@ -64,7 +64,7 @@ def loadFile(name, step=10, timeLimit=-1):
             timeline.pop()
     else:
         # trim les étapes jusqu'à la limite de temps
-        timeline = timeline[:timeLimit/step]
+        timeline = timeline[:int(timeLimit/step)]
 
     # signaux de début et fin
     timeline = [[1*(i==129) for i in range(128+3)]] + timeline + [[1*(i==130) for i in range(128+3)]]
