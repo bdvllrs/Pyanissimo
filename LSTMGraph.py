@@ -161,11 +161,15 @@ class LSTMGraph:
                         grads.append(T.grad(cost, self.layers[k]['weights'][w]))
                         update = (self.layers[k]['weights'][w], self.layers[k]['weights'][w] - learning_rate * grads[-1])
                         updates.append(update)  # Liste des modifs à faire pour la propagtion du gradient
+                    for w in self.layers[k]['biases'].keys():
+                        grads.append(T.grad(cost, self.layers[k]['biases'][w]))
+                        update = (self.layers[k]['biases'][w], self.layers[k]['biases'][w] - learning_rate * grads[-1])
+                        updates.append(update)  # Liste des modifs à faire pour la propagtion du gradient
 
             self.debug_print('Compilation des fonctions BPTT et cost.')
 
-            self.BPTT = function([x, expected], grads)
-            self.cost = function([x, expected], cost)
+            self.BPTT = function([x, expected], grads, allow_input_downcast=True)
+            self.cost = function([x, expected], cost, allow_input_downcast=True)
         if callback is not None:
             stop = callback()
         if not stop:
@@ -193,7 +197,7 @@ class LSTMGraph:
             )
             o = o[0]
 
-            self.predict = function([input, arret, max_temps], o)  # Donne la prédiction à partir de l'entrée
+            self.predict = function([input, arret, max_temps], o, allow_input_downcast=True)  # Donne la prédiction à partir de l'entrée
         if callback is not None:
             stop = callback()
         if not stop:
@@ -201,7 +205,7 @@ class LSTMGraph:
             self.debug_print('Compilation de la fonction d\'apprentissage.')
 
             # Création de la fonction d'entrainement
-            self.train = function([x, expected, learning_rate], [cost, last_output, debug_print], updates=updates)
+            self.train = function([x, expected, learning_rate], [cost, last_output, debug_print], updates=updates, allow_input_downcast=True)
 
             self.debug_print('Graphe initialisé.')
 
