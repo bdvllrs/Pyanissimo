@@ -92,7 +92,7 @@ class LSTM:
         for epoch in range(epochs): # Nombre de fois qu'on re-entraine avec les mêmes données
             for k in np.random.permutation(len(x_train)):  # On utilise un ordre différent à chaque fois
                 x, y = x_train[k], y_train[k]
-                cost, out = self.graph.train(x, y, self.learning_rate)
+                cost, out, deb = self.graph.train(x, y, self.learning_rate)
                 # On appelle les callbacks ajoutés
                 for num_callback in range(nb_callbacks):
                     if count % self.callback_periods[num_callback] == 0:
@@ -104,7 +104,7 @@ class LSTM:
         """
         Execute le reseau et donne la valeur suivante
         :param x: entrée
-        :param stop_condition: valeur de la sortie pour arreter la propadation
+        :param stop_condition: valeur de la sortie pour arreter la propagation
         :param max_temps: valeur de tour de boucle max dans tous les cas
         :return: liste de toutes les sorties au cours du temps
         """
