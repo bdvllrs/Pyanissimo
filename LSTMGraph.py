@@ -60,6 +60,7 @@ class LSTMGraph:
             'weights': {},
             'biases' : {}
         }
+        print(layer['type'], layer['params'])
         self.layers.append(layer)
         return len(self.layers)-1
 
@@ -334,6 +335,8 @@ class LSTMGraph:
         """
         if self.layers[num_layer]['params']['activation_function'] == 'tanh':
             return T.tanh(T.dot(x, self.layers[num_layer]['weights']['W']) + self.layers[num_layer]['biases']['b'])
+        elif self.layers[num_layer]['params']['activation_function'] == 'softmax':
+            return T.nnet.softmax(T.dot(x, self.layers[num_layer]['weights']['W']) + self.layers[num_layer]['biases']['b'])[0]
         return T.nnet.sigmoid(T.dot(x, self.layers[num_layer]['weights']['W']) + self.layers[num_layer]['biases']['b'])
 
     def model_lstm_layer(self, x, h_prev, c_prev, num_layer):

@@ -37,24 +37,24 @@ class LSTM:
         self.add_callback(callback, period)
         return self
 
-    def add_lstm_layer(self, length, weights=None, biases=None):
+    def add_lstm_layer(self, length, weights=None, biases=None, **params):
         """
         Ajoute une couche LSTM
         :param length: taille de la couche
         :param weights: poids à donner (défaut générés aléatoirements)
         :param biases: poids à donner aux biases
         """
-        self.graph.add_lstm_layer(length, weights, biases)
+        self.graph.add_lstm_layer(length, weights, biases, **params)
         return self
 
-    def add_simple_layer(self, length, weights=None, biases=None):
+    def add_simple_layer(self, length, weights=None, biases=None, **params):
         """
         Ajoute une couche simple
         :param length: taille de la couche
         :param weights: poids à donner (défaut générés aléatoirements)
         :param biases: poids à donner aux biases
         """
-        self.graph.add_simple_layer(length, weights, biases)
+        self.graph.add_simple_layer(length, weights, biases, **params)
         return self
 
     def init_graph(self):

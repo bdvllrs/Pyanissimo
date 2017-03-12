@@ -332,7 +332,7 @@ class Interface(tk.Tk):
         self.btLoad = tk.Button(self.cmdFrame, text='Charger des poids', command=self.load_weights)
         self.btLoad.pack(fill=tk.X, expand=True)
 
-        self.entryEpoch = NumberEntry(self.cmdFrame, text='Nombre d\'époques', minval=1, maxval=1000, defaultval=10, numtype='int')
+        self.entryEpoch = NumberEntry(self.cmdFrame, text='Nombre d\'époques', minval=1, maxval=2001, defaultval=10, numtype='int')
         self.entryEpoch.pack()
 
         self.entrySpeed = NumberEntry(self.cmdFrame, text='Vitesse d\'aprentissage', minval=0., maxval=10.00001, defaultval=0.1, numtype='float')
@@ -345,6 +345,9 @@ class Interface(tk.Tk):
         # statut
         self.status = StatusBar(self)
         self.status.grid(row=1, column=0, columnspan=2, sticky=tk.W+tk.E)
+
+        self.music_step = 100  # en ms
+        self.music_length = 60000  # en ms
 
         # entrainement
         self.training = False
@@ -373,10 +376,8 @@ class Interface(tk.Tk):
             if custom_update:
                 custom_update(t)
         update('')
-        self.reseau.add_simple_layer(200)
-        self.reseau.add_lstm_layer(200)
-        self.reseau.add_lstm_layer(200)
-        self.reseau.add_simple_layer(131)
+        self.reseau.add_lstm_layer(131)
+        self.reseau.add_simple_layer(131, activation_function='softmax')
         self.reseau.graph.debug_print = update
         self.reseau.init_graph()
         update('Terminée')
@@ -503,7 +504,7 @@ class Interface(tk.Tk):
                     print('DATA STOP')
                     return
                 # lis le fichier
-                data = file.loadFile('musics/format 0/'+name, 10, 10000)
+                data = file.loadFile('musics/format 0/'+name, self.music_step, self.music_length)
                 # charge les données dans la file
                 self.dataLock.acquire()
                 self.dataQueue.append( (name, data) )
@@ -554,6 +555,8 @@ class Interface(tk.Tk):
                 # entraine
                 cost, _, _ = self.reseau.graph.train(x, y, self.reseau.learning_rate)
                 print('erreur :', cost)
+                if cost <= 1:
+                    self.stoppingTraining = True
                 self.trainingDialog.errorGraph.add_point('error', cost)
                 if num_ex % 20 == 0:  # Sauvegarde le résultat tous les 10 exemples
                     self.reseau.save_weights('data/snapshots/snapshot_' + str(num_ex) + '.dat')
@@ -584,15 +587,19 @@ class Interface(tk.Tk):
             return
         print('Start generation')
         # génère la musique
-        frames = self.reseau.predict([1*(i==129) for i in range(128+3)], [0], 1000)
+        frames = self.reseau.predict([1*(i==129) for i in range(128+3)], [0], self.music_length)
         frames = frames.tolist()
         # fixe à 0 ou 1 les notes
         for n in range(len(frames)):
+            max_key = frames[n].index(max(frames[n]))
+            frames[n][max_key] = 1.
             for i in range(128):
-                frames[n][i] = int(frames[n][i]+0.5)
+                if i != max_key:
+                    frames[n][i] = 0.
+                # frames[n][i] = int(frames[n][i]+0.5)
         print('Saving '+str(len(frames))+' frames')
         # enregistre
-        file.makeFile(frames, 'test.mid')
+        file.makeFile(frames, 'test.mid', self.music_step)
         self.creationFinished = True
         print('Musique écrite!')
         

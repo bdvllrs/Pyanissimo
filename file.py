@@ -68,6 +68,16 @@ def loadFile(name, step=10, timeLimit=-1):
 
     # signaux de début et fin
     timeline = [[1*(i==129) for i in range(128+3)]] + timeline + [[1*(i==130) for i in range(128+3)]]
+    
+    # Test : added to try just with one note
+    for t in range(len(timeline)):
+        found = False
+        for k in range(len(timeline[t])-4, -1, -1):  # We keep only the highest note
+            if timeline[t][k] == 1 and found:
+                timeline[t][k] = 0
+            elif timeline[t][k] == 1 and not found:
+                found = True
+    # End Test
     return np.asarray(timeline)
 
 
@@ -158,42 +168,45 @@ def makeFile(data, filename, step=10):
     # ajout des notes
     currentlyPlaying = [0 for i in range(128)]
     lastChange = -1
+    print(data[-1])
     for n in range(len(data)):
-        frame = data[n][:128]
-        changes = [i for i in range(128) if frame[i] != currentlyPlaying[i]]
-        if len(changes) > 0:
-            # delta_time
-            e = midi.DeltaTime(tr)
-            e.time = 30*(n-lastChange)
-            tr.events.append(e)
-            # note 0
-            e = midi.MidiEvent(tr)
-            e.channel = 1
-            e.type = 'NOTE_ON'
-            e.pitch = changes[0]
-            if frame[changes[0]] == 1:
-                e.velocity = max(min(int(data[n][128]*128),127),0)
-            else:
-                e.velocity = 0
-            tr.events.append(e)
-            for i in range(len(changes)-1):
+        # print(len(data[n]))
+        if type(data[n]) == type([]):
+            frame = data[n][:128]
+            changes = [i for i in range(128) if frame[i] != currentlyPlaying[i]]
+            if len(changes) > 0:
                 # delta_time
                 e = midi.DeltaTime(tr)
-                e.time = 0
+                e.time = 30*(n-lastChange)
                 tr.events.append(e)
                 # note 0
                 e = midi.MidiEvent(tr)
                 e.channel = 1
                 e.type = 'NOTE_ON'
-                e.pitch = changes[i+1]
-                if frame[changes[i+1]] == 1:
+                e.pitch = changes[0]
+                if frame[changes[0]] == 1:
                     e.velocity = max(min(int(data[n][128]*128),127),0)
                 else:
                     e.velocity = 0
                 tr.events.append(e)
+                for i in range(len(changes)-1):
+                    # delta_time
+                    e = midi.DeltaTime(tr)
+                    e.time = 0
+                    tr.events.append(e)
+                    # note 0
+                    e = midi.MidiEvent(tr)
+                    e.channel = 1
+                    e.type = 'NOTE_ON'
+                    e.pitch = changes[i+1]
+                    if frame[changes[i+1]] == 1:
+                        e.velocity = max(min(int(data[n][128]*128),127),0)
+                    else:
+                        e.velocity = 0
+                    tr.events.append(e)
 
-            lastChange = n
-        currentlyPlaying = frame
+                lastChange = n
+            currentlyPlaying = frame
     # delta_time 0
     e = midi.DeltaTime(tr)
     e.time = 0

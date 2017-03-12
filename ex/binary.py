@@ -3,6 +3,8 @@
 Test of the neural network counting in binary
 We give him a number x in binary and outputs x+1 and 2*x+1
 """
+import sys
+sys.path.append('../')
 
 from LSTM import LSTM
 import numpy as np
@@ -12,7 +14,6 @@ max_power = 12
 learning_rate = 0.9
 nn = LSTM(max_power, learning_rate, True)
 nn.add_lstm_layer(max_power+10)
-nn.add_simple_layer(max_power+10)
 nn.add_simple_layer(max_power)
 nn.graph.set_predict_stopping_condition(lambda a,b: 0)
 nn.init_graph()
