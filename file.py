@@ -68,7 +68,8 @@ def loadFile(name, step=10, timeLimit=-1):
 
     # signaux de début et fin
     timeline = [[1*(i==129) for i in range(128+3)]] + timeline + [[1*(i==130) for i in range(128+3)]]
-    
+
+    """
     # Test : added to try just with one note
     for t in range(len(timeline)):
         found = False
@@ -77,6 +78,8 @@ def loadFile(name, step=10, timeLimit=-1):
                 timeline[t][k] = 0
             elif timeline[t][k] == 1 and not found:
                 found = True
+    """
+
     # End Test
     return np.asarray(timeline)
 

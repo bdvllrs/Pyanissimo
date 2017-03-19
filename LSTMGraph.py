@@ -7,6 +7,8 @@ import theano.printing as pr
 import theano.tensor as T
 import pickle
 
+print(config.device, config.force_device)
+
 def print_callback_fn(op, xin):
     for attr in op.attrs:
         temp = getattr(xin, attr)

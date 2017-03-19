@@ -332,12 +332,15 @@ class Interface(tk.Tk):
         self.btLoad = tk.Button(self.cmdFrame, text='Charger des poids', command=self.load_weights)
         self.btLoad.pack(fill=tk.X, expand=True)
 
-        self.entryEpoch = NumberEntry(self.cmdFrame, text='Nombre d\'époques', minval=1, maxval=2001, defaultval=10, numtype='int')
+        self.entryEpoch = NumberEntry(self.cmdFrame, text='Nombre d\'époques', minval=1, maxval=100001, defaultval=10, numtype='int')
         self.entryEpoch.pack()
 
-        self.entrySpeed = NumberEntry(self.cmdFrame, text='Vitesse d\'aprentissage', minval=0., maxval=10.00001, defaultval=0.1, numtype='float')
+        self.entrySpeed = NumberEntry(self.cmdFrame, text='Vitesse d\'aprentissage', minval=0., maxval=100000.1, defaultval=0.1, numtype='float')
         self.entrySpeed.pack()
-        
+
+        self.entryError = NumberEntry(self.cmdFrame, text='Condition d\'erreur\npour l\'arrêt', minval=0., maxval=1000., defaultval=1., numtype='float')
+        self.entryError.pack()
+
         # sélection des fichiers
         self.selectedFiles = FileSelector(self)
         self.selectedFiles.grid(row=0, column=1)
@@ -347,7 +350,7 @@ class Interface(tk.Tk):
         self.status.grid(row=1, column=0, columnspan=2, sticky=tk.W+tk.E)
 
         self.music_step = 100  # en ms
-        self.music_length = 60000  # en ms
+        self.music_length = 10000  # en ms
 
         # entrainement
         self.training = False
@@ -376,8 +379,10 @@ class Interface(tk.Tk):
             if custom_update:
                 custom_update(t)
         update('')
-        self.reseau.add_lstm_layer(131)
-        self.reseau.add_simple_layer(131, activation_function='softmax')
+        self.reseau = LSTM(131, self.entrySpeed.get_value(), True)
+        self.reseau.add_simple_layer(131)
+        self.reseau.add_lstm_layer(200)
+        self.reseau.add_simple_layer(131) #, activation_function='softmax')
         self.reseau.graph.debug_print = update
         self.reseau.init_graph()
         update('Terminée')
@@ -432,7 +437,7 @@ class Interface(tk.Tk):
         for art in self.selectedFiles.files:
             if self.selectedFiles.enabled[art].get() == '1':
                 fileList.extend([art+'/'+n for n in self.selectedFiles.files[art]])
-        print('files:',fileList)
+        print('files:', fileList)
         self.trainingThread = threading.Thread(target=self._train, args=[fileList])
 
         self.readingThread = threading.Thread(target=self._load_data, args=[fileList])
@@ -519,8 +524,8 @@ class Interface(tk.Tk):
         if not fileList:
             return
         # Crée le réseau
-        # if not self.reseau.graph.is_init:
-        self.init_reseau(lambda t: self.trainingDialog.update_file('Initialisation du réseau:'+t, -1))
+        if not self.reseau.graph.is_init:
+            self.init_reseau(lambda t: self.trainingDialog.update_file('Initialisation du réseau:'+t, -1))
 
         # Utilise les données
         if not self.stoppingTraining:
@@ -555,9 +560,12 @@ class Interface(tk.Tk):
                 # entraine
                 cost, _, _ = self.reseau.graph.train(x, y, self.reseau.learning_rate)
                 print('erreur :', cost)
-                if cost <= 1:
+                if cost <= self.entryError.get_value():
                     self.stoppingTraining = True
-                self.trainingDialog.errorGraph.add_point('error', cost)
+                if num_ex % 10 == 0:
+                    self.trainingDialog.errorGraph.add_point('error', cost)
+                else:
+                    self.trainingDialog.errorGraph.add_point('error', cost, False)
                 if num_ex % 20 == 0:  # Sauvegarde le résultat tous les 10 exemples
                     self.reseau.save_weights('data/snapshots/snapshot_' + str(num_ex) + '.dat')
                 num_ex += 1
