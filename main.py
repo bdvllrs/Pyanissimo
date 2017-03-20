@@ -341,6 +341,12 @@ class Interface(tk.Tk):
         self.entryError = NumberEntry(self.cmdFrame, text='Condition d\'erreur\npour l\'arrêt', minval=0., maxval=1000., defaultval=1., numtype='float')
         self.entryError.pack()
 
+        self.entryTroncature = NumberEntry(self.cmdFrame, text='Troncature des fichiers (ms)\n(-1 : pas de limite)', minval=-1., maxval=1000000., defaultval=-1., numtype='float')
+        self.entryTroncature.pack()
+
+        self.entryStep = NumberEntry(self.cmdFrame, text='Pas de la musique (ms)', minval=10., maxval=1000., defaultval=100., numtype='float')
+        self.entryStep.pack()
+
         # sélection des fichiers
         self.selectedFiles = FileSelector(self)
         self.selectedFiles.grid(row=0, column=1)
@@ -349,8 +355,8 @@ class Interface(tk.Tk):
         self.status = StatusBar(self)
         self.status.grid(row=1, column=0, columnspan=2, sticky=tk.W+tk.E)
 
-        self.music_step = 100  # en ms
-        self.music_length = 10000  # en ms
+        self.music_step = self.entryStep  # en ms
+        self.music_length = self.entryTroncature  # en ms
 
         # entrainement
         self.training = False
@@ -378,14 +384,15 @@ class Interface(tk.Tk):
             print('Initialisation du réseau:'+t)
             if custom_update:
                 custom_update(t)
-        update('')
-        self.reseau = LSTM(131, self.entrySpeed.get_value(), True)
-        self.reseau.add_simple_layer(131)
-        self.reseau.add_lstm_layer(200)
-        self.reseau.add_simple_layer(131) #, activation_function='softmax')
-        self.reseau.graph.debug_print = update
-        self.reseau.init_graph()
-        update('Terminée')
+        if not self.reseau.graph.is_init:
+            update('')
+            self.reseau = LSTM(131, self.entrySpeed.get_value(), True)
+            self.reseau.add_simple_layer(131)
+            self.reseau.add_lstm_layer(200)
+            self.reseau.add_simple_layer(131) #, activation_function='softmax')
+            self.reseau.graph.debug_print = update
+            self.reseau.init_graph()
+            update('Terminée')
 
     def confirm_train(self):
         """

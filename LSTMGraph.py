@@ -62,7 +62,6 @@ class LSTMGraph:
             'weights': {},
             'biases' : {}
         }
-        print(layer['type'], layer['params'])
         self.layers.append(layer)
         return len(self.layers)-1
 

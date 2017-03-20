@@ -46,7 +46,7 @@ def loadFile(name, step=10, timeLimit=-1):
                 
     # conversion en tableau des notes par étapes
     timeline = [[0 for k in range(128 + 3)] for n in range(max(noteTimeline.keys())+2)]
-    print(len(timeline))
+    print('File', name, 'of length:', len(timeline), 'loaded.')
     for n in noteTimeline:
         vel = 0
         for p, v in noteTimeline[n]:
