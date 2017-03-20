@@ -341,10 +341,10 @@ class Interface(tk.Tk):
         self.entryError = NumberEntry(self.cmdFrame, text='Condition d\'erreur\npour l\'arrêt', minval=0., maxval=1000., defaultval=1., numtype='float')
         self.entryError.pack()
 
-        self.entryTroncature = NumberEntry(self.cmdFrame, text='Troncature des fichiers (ms)\n(-1 : pas de limite)', minval=-1., maxval=1000000., defaultval=-1., numtype='float')
+        self.entryTroncature = NumberEntry(self.cmdFrame, text='Troncature des fichiers (ms)\n(-1 : pas de limite)', minval=-1, maxval=1000000, defaultval=-1, numtype='int')
         self.entryTroncature.pack()
 
-        self.entryStep = NumberEntry(self.cmdFrame, text='Pas de la musique (ms)', minval=10., maxval=1000., defaultval=100., numtype='float')
+        self.entryStep = NumberEntry(self.cmdFrame, text='Pas de la musique (ms)', minval=10, maxval=1000, defaultval=100, numtype='int')
         self.entryStep.pack()
 
         # sélection des fichiers
@@ -355,8 +355,8 @@ class Interface(tk.Tk):
         self.status = StatusBar(self)
         self.status.grid(row=1, column=0, columnspan=2, sticky=tk.W+tk.E)
 
-        self.music_step = self.entryStep  # en ms
-        self.music_length = self.entryTroncature  # en ms
+        self.music_step = int(self.entryStep.get_value())  # en ms
+        self.music_length = int(self.entryTroncature.get_value())  # en ms
 
         # entrainement
         self.training = False
