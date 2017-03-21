@@ -1,4 +1,3 @@
-# coding: utf-8
 import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.filedialog
@@ -266,7 +265,7 @@ class TrainingDialog(tk.Toplevel):
         self.advLabel.config(text='Etape:'+state)
         self.progAdvValue.set(num)
 
-    def add_error(self, cost):
+    def add_error(self, cost, num_ex):
         """
         Ajoute un point aux graphiques d'erreur
         """
@@ -420,7 +419,6 @@ class Interface(tk.Tk):
         if not self.reseau.graph.is_init:
             update('')
             self.reseau = LSTM(131, self.entrySpeed.get_value(), True)
-            self.reseau.add_simple_layer(131)
             self.reseau.add_lstm_layer(200)
             self.reseau.add_simple_layer(131) #, activation_function='softmax')
             self.reseau.graph.debug_print = update
@@ -600,7 +598,7 @@ class Interface(tk.Tk):
                 # entraine
                 cost, _, _ = self.reseau.graph.train(x, y, self.reseau.learning_rate)
                 print('erreur :', cost)
-                self.trainingDialog.add_error(cost)
+                self.trainingDialog.add_error(cost, num_ex)
                 if cost <= self.entryError.get_value():
                     self.stoppingTraining = True
 
