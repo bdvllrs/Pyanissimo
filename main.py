@@ -336,19 +336,20 @@ class NumberEntry(tk.Frame):
         """
         Validate a change in the Entry widget
         """
-        if reason == 'forced': # changement de la variable interne à l'Entry
+        if reason == 'forced':  # changement de la variable interne à l'Entry
             return True
-
-        try:
-            if self.numtype == 'int':
-                val = int(newtext)
-            elif self.numtype == 'float':
-                val = float(newtext)
-            else:
+        elif reason == 'focusout':  # on a terminé une modification
+            try:
+                if self.numtype == 'int':
+                    val = int(newtext)
+                elif self.numtype == 'float':
+                    val = float(newtext)
+                else:
+                    return False
+            except ValueError:
                 return False
-        except ValueError:
-            return False
-        return self.minval <= val < self.maxval
+            return self.minval <= val < self.maxval
+        return True
 
 
 class Interface(tk.Tk):
