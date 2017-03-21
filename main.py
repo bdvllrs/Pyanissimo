@@ -204,7 +204,7 @@ class Grapher(tk.Canvas):
                 x, y = self.map_scr(self.curves[n][1][0], xspan, yspan)
                 for nx, ny in self.curves[n][1][1:]:
                     nxs, nys = self.map_scr((nx, ny), xspan, yspan)
-                    print('point:', nxs, nys)
+                    # print('point:', nxs, nys)
                     self.create_line((x, y), (nxs, nys), fill=self.curves[n][0])
                     x, y = nxs, nys
 
@@ -282,7 +282,7 @@ class TrainingDialog(tk.Toplevel):
         # mise à jour du graphique d'erreur local
         if len(self.errorLog) < 50:
             self.errorGraph.add_point('local', (len(self.errorLog)-1, cost))
-            print('log:', self.errorLog)
+            # print('log:', self.errorLog)
         if len(self.errorLog) >= 50 and len(self.errorLog)%10 == 0:
             self.errorGraph.set_points('local', [(i, self.errorLog[-50:][i]) for i in range(50)])
         # mise à jour du graphique global (moyenné)
@@ -377,6 +377,9 @@ class Interface(tk.Tk):
         self.btLoad = tk.Button(self.cmdFrame, text='Charger des poids', command=self.load_weights)
         self.btLoad.pack(fill=tk.X, expand=True)
 
+        self.btReinit = tk.Button(self.cmdFrame, text='Réinitialiser le réseau', command=self.init_reseau)
+        self.btReinit.pack(fill=tk.X, expand=True)
+
         self.entryEpoch = NumberEntry(self.cmdFrame, text='Nombre d\'époques', minval=1, maxval=100001, defaultval=10, numtype='int')
         self.entryEpoch.pack()
 
@@ -389,7 +392,7 @@ class Interface(tk.Tk):
         self.entryTroncature = NumberEntry(self.cmdFrame, text='Troncature des fichiers (ms)\n(-1 : pas de limite)', minval=-1, maxval=1000000, defaultval=-1, numtype='int')
         self.entryTroncature.pack()
 
-        self.entryStep = NumberEntry(self.cmdFrame, text='Pas de la musique (ms)', minval=10, maxval=1000, defaultval=100, numtype='int')
+        self.entryStep = NumberEntry(self.cmdFrame, text='Pas de la musique (ms)', minval=10, maxval=1001, defaultval=100, numtype='int')
         self.entryStep.pack()
 
         # sélection des fichiers
@@ -426,14 +429,13 @@ class Interface(tk.Tk):
             print('Initialisation du réseau:'+t)
             if custom_update:
                 custom_update(t)
-        if not self.reseau.graph.is_init:
-            update('')
-            self.reseau = LSTM(131, self.entrySpeed.get_value(), True)
-            self.reseau.add_lstm_layer(200)
-            self.reseau.add_simple_layer(131) #, activation_function='softmax')
-            self.reseau.graph.debug_print = update
-            self.reseau.init_graph()
-            update('Terminée')
+        update('')
+        self.reseau = LSTM(131, self.entrySpeed.get_value(), True)
+        self.reseau.add_lstm_layer(200)
+        self.reseau.add_simple_layer(131) #, activation_function='softmax')
+        self.reseau.graph.debug_print = update
+        self.reseau.init_graph()
+        update('Terminée')
 
     def confirm_train(self):
         """
@@ -478,6 +480,7 @@ class Interface(tk.Tk):
         self.stoppingTraining = False
         self.btTrain.config(state=tk.DISABLED)  # empèche un nouveau clic
         self.btLoad.config(state=tk.DISABLED)
+        self.btReinit.config(state=tk.DISABLED)
         self.btCreate.config(state=tk.DISABLED)
 
         # configuration du thread
@@ -522,10 +525,12 @@ class Interface(tk.Tk):
             self.trainingThread.join()
             self.readingThread.join()
             print('joined')
+            self.status.update(100, 'Fini !')
             self.trainingDialog.destroy()
             self.training = False
             self.btTrain.config(state=tk.ACTIVE)
             self.btLoad.config(state=tk.ACTIVE)
+            self.btReinit.config(state=tk.ACTIVE)
             self.btCreate.config(state=tk.ACTIVE)
         else:
             self.after(500, self.periodic_joiner)
