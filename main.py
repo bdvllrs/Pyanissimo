@@ -118,8 +118,6 @@ class Grapher(tk.Canvas):
         if curvename not in self.curves:
             return
         self.curves[curvename][1].append(pt)
-        if len(self.curves[curvename][1]) > 50:
-            self.curves[curvename][1].pop(0)
         if redraw:
             self.redraw()
 
@@ -129,6 +127,16 @@ class Grapher(tk.Canvas):
         """
         for pt in pointlist:
             self.add_point(curvename, pt, False)
+        if redraw:
+            self.redraw()
+
+    def set_points(self, curvename, pointlist, redraw=True):
+        """
+        Change les points associés à la courbe 'curvename'
+        """
+        if curvename not in self.curves:
+            return
+        self.curves[curvename][1] = pointlist
         if redraw:
             self.redraw()
 
@@ -224,7 +232,11 @@ class TrainingDialog(tk.Toplevel):
         # progression de l'erreur
         self.errorGraph = Grapher(self, 300, 200)
         self.errorGraph.pack(side=tk.RIGHT, anchor=tk.E)
-        self.errorGraph.add_curve('error', 'blue', 'simple')
+        self.errorGraph.add_curve('local', 'blue', 'point')
+        self.errorGraph.add_curve('mean', 'red', 'point')
+        self.errorGraph.add_curve('fake', 'white', 'point') # a fake curve to oblige printing of the origin
+        self.errorGraph.add_point('fake', (0, 0), False)
+        self.errorLog = []
         
     def set_file_qty(self, value):
         """
@@ -253,6 +265,30 @@ class TrainingDialog(tk.Toplevel):
         """
         self.advLabel.config(text='Etape:'+state)
         self.progAdvValue.set(num)
+
+    def add_error(self, cost):
+        """
+        Ajoute un point aux graphiques d'erreur
+        """
+        self.errorLog.append(cost)
+        # mise à jour du graphique d'erreur local
+        if len(self.errorLog) < 50:
+            self.errorGraph.add_point('error', (len(self.errorLog)-1, cost))
+        if num_ex % 10 == 0 and len(self.errorLog) >= 50 and len(self.errorLog)%10 == 0:
+            self.trainingDialog.errorGraph.set_points('error', [(i, self.errorLog[-50:][i]) for i in range(50)])
+        # mise à jour du graphique global (moyenné)
+        if num_ex % 10 == 0 and len(self.errorLog) >= 50 and len(self.errorLog)%10 == 0:
+            meanPts = []
+            n = 0
+            for i in range(50):
+                # calcule une moyenne
+                S, q = 0, 0
+                while n/len(self.errorLog) < (i+1)/50:
+                    S += self.errorLog[n]
+                    q += 1
+                    n += 1
+                meanPts.append(S/q)
+            self.trainingDialog.errorGraph.set_points('mean', meanPts)
 
 
 class NumberEntry(tk.Frame):
@@ -354,9 +390,6 @@ class Interface(tk.Tk):
         # statut
         self.status = StatusBar(self)
         self.status.grid(row=1, column=0, columnspan=2, sticky=tk.W+tk.E)
-
-        self.music_step = int(self.entryStep.get_value())  # en ms
-        self.music_length = int(self.entryTroncature.get_value())  # en ms
 
         # entrainement
         self.training = False
@@ -516,7 +549,7 @@ class Interface(tk.Tk):
                     print('DATA STOP')
                     return
                 # lis le fichier
-                data = file.loadFile('musics/format 0/'+name, self.music_step, self.music_length)
+                data = file.loadFile('musics/format 0/'+name, self.entryStep.get_value(), self.entryTroncature.get_value())
                 # charge les données dans la file
                 self.dataLock.acquire()
                 self.dataQueue.append( (name, data) )
@@ -567,12 +600,10 @@ class Interface(tk.Tk):
                 # entraine
                 cost, _, _ = self.reseau.graph.train(x, y, self.reseau.learning_rate)
                 print('erreur :', cost)
+                self.trainingDialog.add_error(cost)
                 if cost <= self.entryError.get_value():
                     self.stoppingTraining = True
-                if num_ex % 10 == 0:
-                    self.trainingDialog.errorGraph.add_point('error', cost)
-                else:
-                    self.trainingDialog.errorGraph.add_point('error', cost, False)
+
                 if num_ex % 20 == 0:  # Sauvegarde le résultat tous les 10 exemples
                     self.reseau.save_weights('data/snapshots/snapshot_' + str(num_ex) + '.dat')
                 num_ex += 1
@@ -602,7 +633,7 @@ class Interface(tk.Tk):
             return
         print('Start generation')
         # génère la musique
-        frames = self.reseau.predict([1*(i==129) for i in range(128+3)], [0], self.music_length)
+        frames = self.reseau.predict([1*(i==129) for i in range(128+3)], [0], self.entryTroncature.get_value())
         frames = frames.tolist()
         # fixe à 0 ou 1 les notes
         for n in range(len(frames)):
@@ -614,7 +645,7 @@ class Interface(tk.Tk):
                 # frames[n][i] = int(frames[n][i]+0.5)
         print('Saving '+str(len(frames))+' frames')
         # enregistre
-        file.makeFile(frames, 'test.mid', self.music_step)
+        file.makeFile(frames, 'test.mid', self.entryStep.get_value())
         self.creationFinished = True
         print('Musique écrite!')
         
