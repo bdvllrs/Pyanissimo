@@ -1,3 +1,4 @@
+# coding: utf-8
 import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.filedialog
@@ -115,9 +116,13 @@ class Grapher(tk.Canvas):
         Ajoute un point à la courbe 'curvename'
         """
         if curvename not in self.curves:
-            return
-        self.curves[curvename][1].append(pt)
+            raise Exception('no curve:'+curvename)
+        if self.absciss == 'simple':
+            self.curves[curvename][1].append(float(pt))
+        elif self.absciss == 'point':
+            self.curves[curvename][1].append((float(pt[0]), float(pt[1])))
         if redraw:
+            print('redrawing')
             self.redraw()
 
     def add_points(self, curvename, pointlist, redraw=True):
@@ -134,8 +139,11 @@ class Grapher(tk.Canvas):
         Change les points associés à la courbe 'curvename'
         """
         if curvename not in self.curves:
-            return
-        self.curves[curvename][1] = pointlist
+            raise Exception('no curve:'+curvename)
+        if self.absciss == 'simple':
+            self.curves[curvename][1] = [float(e) for e in pointlist]
+        elif self.absciss == 'point':
+            self.curves[curvename][1] = [(float(x), float(y)) for x,y in pointlist]
         if redraw:
             self.redraw()
 
@@ -196,6 +204,7 @@ class Grapher(tk.Canvas):
                 x, y = self.map_scr(self.curves[n][1][0], xspan, yspan)
                 for nx, ny in self.curves[n][1][1:]:
                     nxs, nys = self.map_scr((nx, ny), xspan, yspan)
+                    print('point:', nxs, nys)
                     self.create_line((x, y), (nxs, nys), fill=self.curves[n][0])
                     x, y = nxs, nys
 
@@ -234,7 +243,7 @@ class TrainingDialog(tk.Toplevel):
         self.errorGraph.add_curve('local', 'blue', 'point')
         self.errorGraph.add_curve('mean', 'red', 'point')
         self.errorGraph.add_curve('fake', 'white', 'point') # a fake curve to oblige printing of the origin
-        self.errorGraph.add_point('fake', (0, 0), False)
+        self.errorGraph.add_points('fake', [(0, 0), (0.1, 0.1), (0.2, 0.2)], False)
         self.errorLog = []
         
     def set_file_qty(self, value):
@@ -265,18 +274,19 @@ class TrainingDialog(tk.Toplevel):
         self.advLabel.config(text='Etape:'+state)
         self.progAdvValue.set(num)
 
-    def add_error(self, cost, num_ex):
+    def add_error(self, cost):
         """
         Ajoute un point aux graphiques d'erreur
         """
         self.errorLog.append(cost)
         # mise à jour du graphique d'erreur local
         if len(self.errorLog) < 50:
-            self.errorGraph.add_point('error', (len(self.errorLog)-1, cost))
-        if num_ex % 10 == 0 and len(self.errorLog) >= 50 and len(self.errorLog)%10 == 0:
-            self.trainingDialog.errorGraph.set_points('error', [(i, self.errorLog[-50:][i]) for i in range(50)])
+            self.errorGraph.add_point('local', (len(self.errorLog)-1, cost))
+            print('log:', self.errorLog)
+        if len(self.errorLog) >= 50 and len(self.errorLog)%10 == 0:
+            self.errorGraph.set_points('local', [(i, self.errorLog[-50:][i]) for i in range(50)])
         # mise à jour du graphique global (moyenné)
-        if num_ex % 10 == 0 and len(self.errorLog) >= 50 and len(self.errorLog)%10 == 0:
+        if len(self.errorLog) >= 50 and len(self.errorLog)%10 == 0:
             meanPts = []
             n = 0
             for i in range(50):
@@ -286,8 +296,8 @@ class TrainingDialog(tk.Toplevel):
                     S += self.errorLog[n]
                     q += 1
                     n += 1
-                meanPts.append(S/q)
-            self.trainingDialog.errorGraph.set_points('mean', meanPts)
+                meanPts.append((i, S/q))
+            self.errorGraph.set_points('mean', meanPts)
 
 
 class NumberEntry(tk.Frame):
@@ -598,7 +608,7 @@ class Interface(tk.Tk):
                 # entraine
                 cost, _, _ = self.reseau.graph.train(x, y, self.reseau.learning_rate)
                 print('erreur :', cost)
-                self.trainingDialog.add_error(cost, num_ex)
+                self.trainingDialog.add_error(cost)
                 if cost <= self.entryError.get_value():
                     self.stoppingTraining = True
 
