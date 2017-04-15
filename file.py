@@ -69,20 +69,86 @@ def loadFile(name, step=10, timeLimit=-1):
     # signaux de début et fin
     timeline = [[1*(i==129) for i in range(128+3)]] + timeline + [[1*(i==130) for i in range(128+3)]]
 
-    """
     # Test : added to try just with one note
-    for t in range(len(timeline)):
-        found = False
-        for k in range(len(timeline[t])-4, -1, -1):  # We keep only the highest note
-            if timeline[t][k] == 1 and found:
-                timeline[t][k] = 0
-            elif timeline[t][k] == 1 and not found:
-                found = True
-    """
-
+    # for t in range(len(timeline)):
+    #     found = False
+    #     for k in range(len(timeline[t])-4, -1, -1):  # We keep only the highest note
+    #         if timeline[t][k] == 1 and found:
+    #             timeline[t][k] = 0
+    #         elif timeline[t][k] == 1 and not found:
+    #             found = True
+    # print(timeline)
     # End Test
     return np.asarray(timeline)
 
+def load_file_mod(name, step=10, timeLimit=-1):
+    """
+    Charge un fichier, et le converti en tableau de notes échantillonées
+    :param step: pas de quantification de la musique (ms)
+    :param timeLimit: temps total limite de la musique (ms)
+                      ignoré si négatif
+    """
+    m = midi.MidiFile()
+    m.open(name)
+    m.read()
+    m.close()
+
+    # print(m.tracks[0])
+    # conversion en notes jouées toutes les <step> ms
+    noteTimeline = {}
+    currentNotes = {p: [-1, 0] for p in range(36)}
+    currentTempo = 500000
+    lastTempoTimeMicro = 0
+    lastTempoTimeTick = 0
+    for e in m.tracks[0].events:
+        pitch = e.pitch%36
+        if e.type == 'SET_TEMPO':  # changement de tempo dans la piste
+            t = (e.time-lastTempoTimeTick)*currentTempo/m.ticksPerQuarterNote + lastTempoTimeMicro # durée en µs
+            currentTempo = e.data
+            lastTempoTimeMicro = t
+            lastTempoTimeTick = e.time
+        elif e.type == 'NOTE_ON':  # début/fin d'une note
+            t = (e.time-lastTempoTimeTick)*currentTempo/m.ticksPerQuarterNote + lastTempoTimeMicro # durée en µs
+            n = int( t/(step*1000) )
+            if e.velocity != 0:
+                # début d'une note -> ajout aux notes actuelles
+                currentNotes[pitch] = [n, e.velocity]
+            else:
+                # fin d'une note: rempli le tableau de 1 depuis le début de cette note
+                if currentNotes[pitch][0] == -1:
+                    continue
+                for k in range(currentNotes[pitch][0], n):
+                    if k not in noteTimeline:
+                        noteTimeline[k] = []  # ajout de la clé de temps <k>
+                    vel = currentNotes[pitch][1]
+                    noteTimeline[k].append( (pitch, vel) )
+                currentNotes[pitch] = [-1, 0]
+                
+    # conversion en tableau des notes par étapes
+    timeline = [[0 for k in range(36 + 3)] for n in range(max(noteTimeline.keys())+2)]
+    print('File', name, 'of length:', len(timeline), 'loaded.')
+    for n in noteTimeline:
+        vel = 0
+        for p, v in noteTimeline[n]:
+            vel += v
+            timeline[n+1][p] = 1
+        timeline[n+1][36] = (vel/len(noteTimeline[n]))/36 # moyennage de la vitesse
+
+    # trim les étapes vides au début
+    while all(tm == 0 for tm in timeline[0]):
+        timeline.pop(0)
+    # trim les étapes selon la limite de temps
+    if timeLimit < 0:
+        # trim les étapes vides à la fin
+        while all(tm == 0 for tm in timeline[-1]):
+            timeline.pop()
+    else:
+        # trim les étapes jusqu'à la limite de temps
+        timeline = timeline[:int(timeLimit/step)]
+
+    # signaux de début et fin
+    timeline = [[1*(i==37) for i in range(39)]] + timeline + [[1*(i==38) for i in range(39)]]
+    return np.asarray(timeline)
 
 def to3bytes(num):
     """

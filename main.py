@@ -419,7 +419,7 @@ class Interface(tk.Tk):
         self.creationThread = None
         self.creationFinished = True
 
-        self.reseau = LSTM(131, self.entrySpeed.get_value(), True)
+        self.reseau = LSTM(39, self.entrySpeed.get_value(), True)
 
     def init_reseau(self, custom_update=None):
         """
@@ -431,9 +431,11 @@ class Interface(tk.Tk):
             if custom_update:
                 custom_update(t)
         update('')
-        self.reseau = LSTM(131, self.entrySpeed.get_value(), True)
-        self.reseau.add_lstm_layer(200)
-        self.reseau.add_simple_layer(131) #, activation_function='softmax')
+        # self.reseau = LSTM(39, self.entrySpeed.get_value(), True)
+        self.reseau.add_lstm_layer(700)
+        self.reseau.add_lstm_layer(700)
+        self.reseau.add_lstm_layer(700)
+        self.reseau.add_simple_layer(39) #, activation_function='softmax')
         self.reseau.graph.debug_print = update
         self.reseau.init_graph()
         update('Terminée')
@@ -563,7 +565,7 @@ class Interface(tk.Tk):
                     print('DATA STOP')
                     return
                 # lis le fichier
-                data = file.loadFile('musics/format 0/'+name, self.entryStep.get_value(), self.entryTroncature.get_value())
+                data = file.load_file_mod('musics/format 0/'+name, self.entryStep.get_value(), self.entryTroncature.get_value())
                 # charge les données dans la file
                 self.dataLock.acquire()
                 self.dataQueue.append( (name, data) )
@@ -618,8 +620,9 @@ class Interface(tk.Tk):
                 if cost <= self.entryError.get_value():
                     self.stoppingTraining = True
 
-                if num_ex % 20 == 0:  # Sauvegarde le résultat tous les 10 exemples
-                    self.reseau.save_weights('data/snapshots/snapshot_' + str(num_ex) + '.dat')
+                self.reseau.save_weights('data/snapshots/last_snapshot.dat')
+                # if num_ex % 50 == 0:  # Sauvegarde le résultat tous les 50 exemples
+                #     self.reseau.save_weights('data/snapshots/snapshot_' + str(num_ex) + '.dat')
                 num_ex += 1
 
                 if self.stoppingTraining:
@@ -647,16 +650,17 @@ class Interface(tk.Tk):
             return
         print('Start generation')
         # génère la musique
-        frames = self.reseau.predict([1*(i==129) for i in range(128+3)], [0], self.entryTroncature.get_value())
+        frames = self.reseau.predict([1*(i==37) for i in range(39)], [0], self.entryTroncature.get_value())
         frames = frames.tolist()
+        res = [[0 for k in range(128 + 3)] for n in range(len(frames))]
         # fixe à 0 ou 1 les notes
-        for n in range(len(frames)):
-            max_key = frames[n].index(max(frames[n]))
-            frames[n][max_key] = 1.
-            for i in range(128):
-                if i != max_key:
-                    frames[n][i] = 0.
-                # frames[n][i] = int(frames[n][i]+0.5)
+        for n in range(len(res)):
+            # max_key = frames[n].index(max(frames[n]))
+            # frames[n][max_key] = 1.
+            for i in range(36):
+            #     if i != max_key:
+            #         frames[n][i] = 0.
+                res[n][48+i] = int(frames[n][i]+0.5)
         print('Saving '+str(len(frames))+' frames')
         # enregistre
         file.makeFile(frames, 'test.mid', self.entryStep.get_value())
