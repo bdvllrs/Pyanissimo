@@ -9,6 +9,9 @@ Make sure you have a
 in the project (to save the weights and biases).
 See the wiki to learn more about the Neural Net Class we made.
 
+## Installation
+See the wiki.
+
 ## Dependencies
 - python >= 3.4
 - theano (http://deeplearning.net/software/theano/install.html)
